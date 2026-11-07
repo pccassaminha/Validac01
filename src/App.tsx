@@ -1,0 +1,8704 @@
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import {
+  Check,
+  CheckCheck,
+  BadgeCheck,
+  ShieldCheck,
+  ShieldAlert,
+  Activity,
+  CheckCircle,
+  PackageOpen,
+  ClipboardCheck,
+  Pencil,
+  ShoppingBag,
+  TriangleAlert,
+  Crown,
+  XCircle,
+  X,
+  ArrowLeft,
+  Lock,
+  Loader2,
+  Info,
+  Star,
+  Eye,
+  EyeOff,
+  Copy,
+  MessageCircle,
+  MessageSquare,
+  Truck,
+  Clock,
+  Search,
+  Filter,
+  Download,
+  User,
+  Users,
+  LayoutDashboard,
+  Settings,
+  ExternalLink,
+  LogOut,
+  ChevronDown,
+  Store,
+  FileText,
+  AlertOctagon,
+  Trash2,
+  Timer,
+  Paperclip,
+  FolderOpen,
+  Monitor,
+  Smartphone,
+  Phone,
+  MapPin,
+  Tablet,
+  Bot,
+  Upload,
+  Edit,
+  Sparkles,
+  Share2,
+  Dumbbell,
+  Zap,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Sun,
+  Moon,
+  MoreVertical,
+  Target,
+  Award,
+  Power,
+  ToggleLeft,
+  ToggleRight,
+  CheckSquare,
+  Calculator,
+  FileSpreadsheet,
+  PackageCheck,
+  Rocket,
+  Calendar,
+} from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { motion, AnimatePresence } from "motion/react";
+import { db, auth, handleFirestoreError, OperationType } from "./firebase";
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  getDocs,
+  getDoc,
+  getDocFromCache,
+  getDocFromServer,
+  query,
+  orderBy,
+  serverTimestamp,
+  Timestamp,
+  deleteDoc,
+  where,
+  setDoc,
+  onSnapshot,
+} from "firebase/firestore";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updatePassword,
+  updateProfile,
+  updateEmail,
+  onAuthStateChanged,
+  signOut,
+} from "firebase/auth";
+import AuthView from "./AuthView";
+import UsersView from "./UsersView";
+import HomeView from "./HomeView";
+import CamisaSedaView from "./components/CamisaSedaView";
+import { CintaColombianaView } from "./components/CintaColombianaView";
+import VisorAutomovelView from "./components/VisorAutomovelView";
+import { CardCalculatorView } from "./components/CardCalculatorView";
+import { AdminSubNav, AdminSubViewType } from "./components/AdminSubNav";
+import { CrmPipelineView } from "./components/CrmPipelineView";
+import { LeadDetailDrawer } from "./components/LeadDetailDrawer";
+import { AiProspectingView } from "./components/AiProspectingView";
+import { MetaConnectionHub } from "./components/MetaConnectionHub";
+import { ProspectLead } from "./services/geminiProspecting";
+import { sendMetaConversionEvent } from "./services/metaIntegration";
+import { WhatsAppActionModal, WhatsAppModalData } from "./components/WhatsAppActionModal";
+import { PWAInstallButton } from "./components/PWAInstallButton";
+
+// ==========================================
+// MÁQUINA DE GROWTH: Configuração de Pixels
+// ==========================================
+const campaignConfigs: Record<string, { fbPixel: string; googleTag: string }> =
+  {
+    "Secador Inteligente UV": {
+      // ATENÇÃO: Substitua os valores abaixo pelos seus IDs reais
+      fbPixel: "1234567890", // Exemplo: 1234567890
+      googleTag: "AW-123456789", // Exemplo: AW-123456789
+    },
+  };
+
+let pixelsLoaded = ""; // Store the ID that was loaded to avoid double loading the same thing
+
+const initTracking = (
+  produto: string,
+  dynamicSettings?: { fbPixel?: string; googleTag?: string },
+) => {
+  if (typeof window === "undefined") return;
+
+  // Use dynamic settings if provided, otherwise fallback to hardcoded configs
+  const config =
+    dynamicSettings?.fbPixel || dynamicSettings?.googleTag
+      ? {
+          fbPixel: dynamicSettings.fbPixel || "",
+          googleTag: dynamicSettings.googleTag || "",
+        }
+      : campaignConfigs[produto];
+
+  if (!config) return;
+
+  const fbId = config.fbPixel;
+  const gTag = config.googleTag;
+
+  // Check if we already loaded this specific combination
+  const currentKey = `${fbId}-${gTag}`;
+  if (pixelsLoaded === currentKey) return;
+
+  // Facebook Pixel
+  if (fbId) {
+    // @ts-ignore
+    !(function (f, b, e, v, n, t, s) {
+      if ((f as any).fbq) return;
+      n = (f as any).fbq = function () {
+        n.callMethod
+          ? n.callMethod.apply(n, arguments)
+          : n.queue.push(arguments);
+      };
+      if (!(f as any)._fbq) (f as any)._fbq = n;
+      n.push = n;
+      n.loaded = !0;
+      n.version = "2.0";
+      n.queue = [];
+      t = b.createElement(e) as HTMLScriptElement;
+      t.async = !0;
+      t.src = v;
+      s = b.getElementsByTagName(e)[0];
+      if (s && s.parentNode) s.parentNode.insertBefore(t, s);
+    })(
+      window,
+      document,
+      "script",
+      "https://connect.facebook.net/en_US/fbevents.js",
+    );
+    (window as any).fbq("init", fbId);
+    (window as any).fbq("track", "PageView");
+    (window as any).fbq("track", "ViewContent");
+
+    // Add noscript fallback
+    const noscript = document.createElement("noscript");
+    noscript.innerHTML = `<img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${fbId}&ev=PageView&noscript=1" />`;
+    document.body.appendChild(noscript);
+  }
+
+  // Google Analytics
+  if (gTag) {
+    const scriptTag = document.createElement("script");
+    scriptTag.async = true;
+    scriptTag.src = `https://www.googletagmanager.com/gtag/js?id=${gTag}`;
+    document.head.appendChild(scriptTag);
+    (window as any).dataLayer = (window as any).dataLayer || [];
+    function gtag() {
+      (window as any).dataLayer.push(arguments);
+    }
+    (window as any).gtag = gtag;
+    (window as any).gtag("js", new Date());
+    (window as any).gtag("config", gTag);
+  }
+
+  pixelsLoaded = currentKey;
+};
+
+const trackEvent = (
+  produto: string,
+  eventName: string,
+  fbEvent: string,
+  dynamicSettings?: { fbPixel?: string; googleTag?: string },
+) => {
+  // Dispara sempre o evento do Facebook se a tag existir (via index.html ou dinâmica)
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("track", fbEvent);
+  }
+
+  const config =
+    dynamicSettings?.fbPixel || dynamicSettings?.googleTag
+      ? {
+          fbPixel: dynamicSettings.fbPixel || "",
+          googleTag: dynamicSettings.googleTag || "",
+        }
+      : campaignConfigs[produto];
+
+  if (config?.googleTag && (window as any).gtag) {
+    (window as any).gtag("event", eventName, { send_to: config.googleTag });
+  }
+};
+
+const TESTIMONIALS = [
+  {
+    name: "João M., Luanda",
+    comment:
+      "Usava spray todo dia e o chulé voltava sempre. Comprei este há 3 semanas e os meus sapatos de trabalho estão sempre secos e sem cheiro. Nunca mais precisei do spray. Entrega super rápida!",
+    rating: 5,
+  },
+  {
+    name: "Sílvia C., Talatona",
+    comment:
+      "Vale cada kwanza. Seca os sapatos rápido sem estragar o material. Paguei na entrega com total segurança. Excelente para época de chuva.",
+    rating: 5,
+  },
+  {
+    name: "Carlos R., Kilamba",
+    comment:
+      "Incrível como a luz UV tira mesmo o cheiro. Uso nos meus ténis de corrida que ficavam encharcados. O produto chegou no mesmo dia que encomendei.",
+    rating: 5,
+  },
+];
+
+const TESTIMONIALS_ROUPAS = [
+  {
+    name: "Joana S., Maianga",
+    comment:
+      "Vivo no 4º andar e sempre tive vergonha de deixar a minha roupa íntima no estendal comum. Agora seco tudo dentro do quarto em 2 horas. Comprei há 3 semanas e já não consigo imaginar sem ele.",
+    rating: 5,
+  },
+  {
+    name: "Carlos A., Kilamba",
+    comment:
+      "As camisas de trabalho e as roupas das crianças ficavam dias a secar. Agora lavo à noite e de manhã está tudo pronto. Vale cada kwanza.",
+    rating: 5,
+  },
+  {
+    name: "Marta V., Talatona",
+    comment:
+      "A minha roupa ficava com aquele cheiro a bafio horrível. Percebi que era fungo da humidade. Desde que comprei o secador o cheiro desapareceu completamente.",
+    rating: 5,
+  },
+  {
+    name: "Nkosi B., Viana",
+    comment:
+      "Silencioso, rápido e discreto. Seco as minhas roupas de desporto depois do treino sem incomodar ninguém em casa. Recomendo a toda a gente que vive em apartamento.",
+    rating: 5,
+  },
+];
+
+const RECENT_BUYERS = [
+  { name: "Kelson", city: "Luanda", time: "Há 2 min" },
+  { name: "Nádia", city: "Talatona (Luanda)", time: "Há 5 min" },
+  { name: "Paulo", city: "Kilamba (Luanda)", time: "Há 1 min" },
+  { name: "Beatriz", city: "Viana (Luanda)", time: "Agora" },
+  { name: "Helder", city: "Nova Vida (Luanda)", time: "Há 10 min" },
+  { name: "Cláudio", city: "Maianga (Luanda)", time: "Há 3 min" },
+  { name: "Ana", city: "Benfica (Luanda)", time: "Há 8 min" },
+  { name: "João", city: "Talatona (Luanda)", time: "Há 4 min" },
+];
+
+const RECENT_BUYERS_CINTA = [
+  { name: "Vanessa M.", city: "Talatona (Luanda)", time: "Há 2 min" },
+  { name: "Jandira K.", city: "Kilamba (Luanda)", time: "Há 5 min" },
+  { name: "Carmen P.", city: "Maianga (Luanda)", time: "Há 1 min" },
+  { name: "Nair B.", city: "Viana (Luanda)", time: "Agora" },
+  { name: "Sandra A.", city: "Nova Vida (Luanda)", time: "Há 8 min" },
+  { name: "Vânia S.", city: "Benfica (Luanda)", time: "Há 3 min" },
+  { name: "Helena G.", city: "Alvalade (Luanda)", time: "Há 4 min" },
+  { name: "Edna F.", city: "Miramar (Luanda)", time: "Há 6 min" },
+];
+
+const IMAGES = [
+  "https://i.postimg.cc/PJc42xy9/main-image-1.webp",
+  "https://i.postimg.cc/gkX4rVcH/main-image-2.webp",
+  "https://i.postimg.cc/Qx9SVQxZ/main-image-3.webp",
+  "https://i.postimg.cc/gkX4rVc1/main-image-4.webp",
+  "https://i.postimg.cc/FsdG1yFP/main-image-5.webp",
+  "https://i.postimg.cc/qMPwKNgF/main-image-6.webp",
+];
+
+const IMAGES_ROUPAS = [
+  "https://i.postimg.cc/nhQGXjQ9/05.png",
+  "https://i.postimg.cc/K8gD1kgL/06.png",
+  "https://i.postimg.cc/9QqYDRq4/Cria-4.png",
+];
+
+type ModalState =
+  | "none"
+  | "step1"
+  | "step2"
+  | "last-chance"
+  | "testimonial-rebound"
+  | "success"
+  | "rejected"
+  | "profile"
+  | "danger-zone"
+  | "danger-action-page-prompt"
+  | "danger-action-page-confirm"
+  | "danger-action-all-prompt"
+  | "danger-alert"
+  | "delete-lead-confirm"
+  | "delete-bulk-confirm"
+  | "lead-preview"
+  | "admin-financial-panel";
+
+const FAQ_ROUPAS = [
+  {
+    q: "Gasta muita electricidade?",
+    a: "Apenas 600W — menos do que um ferro de engomar normal. Uma sessão de 2 horas custa menos de 50 Kz em electricidade.",
+  },
+  {
+    q: "É muito grande para um apartamento pequeno?",
+    a: "Tem apenas 32 x 24 x 15 cm. Cabe numa gaveta, debaixo da cama ou no topo do roupeiro. Dobra para guardar.",
+  },
+  {
+    q: "Funciona mesmo ou é mais um produto que não cumpre?",
+    a: "A tecnologia PTC aquece o ar de forma uniforme e contínua. Não é um ventilador — é ar quente real que penetra no tecido e elimina a humidade de dentro para fora.",
+  },
+  {
+    q: "E se eu comprar e não gostar?",
+    a: "Pagas apenas quando o produto chega à tua porta. Se não ficares satisfeito nos primeiros 7 dias, contacta-nos e resolves sem complicação.",
+  },
+  {
+    q: "Fazem entregas em quais províncias?",
+    a: "Actualmente, as entregas do Secador Expresso Pro são realizadas exclusivamente na província de Luanda com entrega rápida e pagamento no acto da recepção.",
+  },
+  {
+    q: "Estraga os tecidos delicados?",
+    a: "O ar quente é suave e controlado. Seguro para roupa íntima, tecidos finos, sintéticos e algodão. Não amarrota nem danifica.",
+  },
+];
+
+const IMAGES_ROTEADOR = [
+  "https://i.postimg.cc/jjvBx9jT/main-image-1.webp",
+  "https://i.postimg.cc/tgD8qfg9/main-image-2.webp",
+  "https://i.postimg.cc/mDDJtwcT/main-image-3.webp",
+  "https://i.postimg.cc/bJJWsTGp/main-image-4.webp",
+  "https://i.postimg.cc/JnnvGqyc/main-image-5.webp",
+];
+
+const TESTIMONIALS_ROTEADOR = [
+  {
+    name: "Hélder M., Talatona",
+    comment:
+      "Eu trabalho em TI e precisava de net rápida. Já tentei fibra, mas o serviço caía sempre. Comprei o ZTE MC888 Ultra, pus um chip da Africel e estou a tirar estabilidade que nunca tive. 5G real dentro de casa, os 3600 Mbps de WiFi 6 fazem muita diferença.",
+    rating: 5,
+  },
+  {
+    name: "Ana P., Luanda",
+    comment:
+      "Vale cada Kwanza! Estava cansada de ficar refém de planos caros de operadoras que falhavam. Agora eu decido qual chip usar (Unitel ou Africel dependendo do mês) e a velocidade de internet é sempre top. Design lindo e não ocupa espaço.",
+    rating: 5,
+  },
+  {
+    name: "Rui C., Benfica",
+    comment:
+      "Chega de router bloqueado que só serve pra uma operadora. O 5G aqui bate nos 2Gbps. Instalação em 2 minutos. Foi só espetar o chip e meter na tomada e já tava a voar no WiFi6. Entrega excelente no mesmo dia.",
+    rating: 5,
+  },
+];
+
+const FAQ_ROTEADOR = [
+  {
+    q: "O router vem bloqueado a alguma operadora?",
+    a: "Não! É 100% livre e desbloqueado para qualquer rede em Angola (Africel, Unitel, Movicel) ou no mundo inteiro. Seja livre para escolher a sua operadora e trocar de chip quando quiser.",
+  },
+  {
+    q: "Qual a diferença entre um router normal e este Ultra 5G WiFi 6?",
+    a: "Um router normal 4G atinge velocidades baixas de até 100-300 Mbps e suporta poucos aparelhos. Este router Ultra Capta rede 5G verdadeira e alcança até 3600 Mbps (WiFi 6). Suporta até 32 dispositivos sem travar, garantindo velocidade para toda casa ou empresa.",
+  },
+  {
+    q: "Preciso de instalação técnica?",
+    a: "Não é necessário nenhum técnico. É 'Plug and Play'. Insira o cartão SIM, ligue à tomada e o seu WiFi estará pronto para uso. Para se conectar, tem inclusive o toque NFC: é só encostar o celular que já fica ligado no Wi-Fi.",
+  },
+  {
+    q: "Vale a pena o investimento?",
+    a: "Absolutamente! Se a qualidade e velocidade de internet são fundamentais para o seu trabalho, conforto ou empresa, ter acesso constante ao 5G mais rápido de Angola vai acabar com o seu stress diário com as redes convencionais.",
+  },
+];
+
+const IMAGES_BASE_MOVEL = [
+  "https://i.postimg.cc/7Lq3782G/main-image-1.webp",
+  "https://i.postimg.cc/ZqJ83td0/main-image-2.webp",
+  "https://i.postimg.cc/k57Q83bn/main-image-3.webp",
+  "https://i.postimg.cc/ZqJ83tdY/main-image-4.webp",
+  "https://i.postimg.cc/xd9vHDzf/main-image-5.webp",
+  "https://i.postimg.cc/W4sGrLkj/main-image-6.webp",
+];
+
+const TESTIMONIALS_BASE_MOVEL = [
+  {
+    name: "Dona Maria, Talatona",
+    comment:
+      "O par por 15.000 Kz é um achado! Encaixei debaixo da geladeira e do fogão. Agora puxo tudo com uma mão para limpar sem riscar o chão nem fazer força!",
+    rating: 5,
+  },
+  {
+    name: "Teresa K., Kilamba",
+    comment:
+      "Super resistente! Coloquei no meu fogão e na máquina de lavar de 12kg. Antes era uma luta e arriscava estragar o azulejo, agora limpo por trás em segundos e travo no lugar.",
+    rating: 5,
+  },
+  {
+    name: "António P., Maianga",
+    comment:
+      "Chegou super rápido aqui em Luanda. Paguei no ato da entrega. O par vem completo com 2 bases ajustáveis. O metal é forte e sustenta a arca e o fogão sem arranhar nada.",
+    rating: 5,
+  },
+];
+
+const FAQ_BASE_MOVEL = [
+  {
+    q: "Serve para qualquer fogão, máquina de lavar, geladeira ou arca?",
+    a: "Sim! A base é totalmente ajustável (de 72 x 4 x 5,2 cm) e suporta aparelhos pesados de praticamente qualquer tamanho doméstico, como fogões, máquinas de lavar, geladeiras, frigoríficos, arcas e até móveis pesados — movimentando tudo sem danificar nem riscar o piso.",
+  },
+  {
+    q: "O valor de 15.000 Kz inclui o par completo?",
+    a: "Sim! Por apenas 15.000 Kz (50% de desconto sobre o preço normal de 30.000 Kz) você recebe 1 PAR COMPLETO (2 hastes metálicas ajustáveis com rodízios 360° para apoiar ambos os lados do eletrodoméstico). Não paga nada antecipado — paga apenas na entrega (COD).",
+  },
+  {
+    q: "Preciso de ferramentas ou técnico para instalar?",
+    a: "Não precisa de nada! Basta levantar ligeiramente os cantos do seu aparelho, posicionar as bases metálicas por baixo e acionar as travas de segurança dos rodízios. Simples e sem complicações.",
+  },
+  {
+    q: "O aparelho não vai ficar a deslizar sozinho quando estiver a trabalhar?",
+    a: "Não! Os rodízios têm trava de segurança reforçada. Quando a trava está acionada, a base fica completamente fixa e estável, mesmo durante a centrifugação pesada da máquina de lavar ou trepidação do fogão.",
+  },
+  {
+    q: "Quanto tempo demora a entrega em Luanda?",
+    a: "Entregas em Luanda são feitas rapidamente por estafeta próprio em poucos dias úteis após a confirmação da sua reserva. Pagamento seguro feito no ato da entrega.",
+  },
+];
+
+function AccordionItem({
+  question,
+  answer,
+  isDarkTheme = false
+}: {
+  question: string;
+  answer: string;
+  isDarkTheme?: boolean;
+  key?: any;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className={`${isDarkTheme ? 'bg-slate-900/50 border-white/10' : 'bg-white border-slate-200'} rounded-2xl border shadow-sm overflow-hidden transition-all`}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-6 py-5 text-left flex justify-between items-center hover:bg-slate-50 transition-colors"
+      >
+        <span className="font-bold text-slate-800 pr-4">{question}</span>
+        <ChevronDown
+          size={20}
+          className={`text-slate-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="px-6 pb-6 text-slate-600 text-sm leading-relaxed border-t border-slate-50 pt-4">
+              {answer}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export default function App() {
+  const [view, setView] = useState<string>(() => {
+    const pathname = window.location.pathname.toLowerCase();
+    if (pathname === "/admin" || pathname === "/admin/") {
+      return "admin";
+    }
+    if (pathname === "/calculadora" || pathname === "/calculadora/") {
+      return "admin";
+    }
+    const params = new URLSearchParams(window.location.search);
+    const product = params.get("product");
+    const viewParam = params.get("view");
+    if (product === "visor-automovel" || product === "visor" || viewParam === "sales-visor-automovel") return "sales-visor-automovel";
+    if (product === "cinta-colombiana") return "sales-cinta-colombiana";
+    if (product === "secador-uv") return "sales";
+    if (product === "cabide-secador") return "sales-roupas";
+    if (product === "roteador-5g") return "sales-roteador";
+    if (product === "base-movel" || product === "base-movel-360") return "sales-base-movel";
+    if (product === "camisa-seda") return "sales-camisa-seda";
+    const storedView = localStorage.getItem("validaC_current_view");
+    if (storedView) return storedView;
+    return "home";
+  });
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const isSalesView =
+    view === "sales" ||
+    view === "sales-roupas" ||
+    view === "sales-roteador" ||
+    view === "sales-base-movel" ||
+    view === "sales-camisa-seda" ||
+    view === "sales-cinta-colombiana" ||
+    view === "sales-visor-automovel";
+
+  const formatPhoneWithCensorship = (phone: string | undefined | null) => {
+    if (!phone) return "";
+    if (!hidePhones) return phone;
+    let digitCount = 0;
+    return phone
+      .split("")
+      .map((char) => {
+        if (/\d/.test(char)) {
+          digitCount++;
+          if (digitCount > 4 && digitCount < 10) {
+            return "•";
+          }
+        }
+        return char;
+      })
+      .join("");
+  };
+
+  // Profile State
+  const [profileFormData, setProfileFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+  });
+
+  // Sales State
+  const [modalState, setModalState] = useState<ModalState>("none");
+  const [lastSubmittedLead, setLastSubmittedLead] = useState<{
+    color?: string;
+    size?: string;
+    totalPrice: number;
+    productName: string;
+  } | null>(null);
+  const [leadToDelete, setLeadToDelete] = useState<any>(null);
+  const [isDeletingLead, setIsDeletingLead] = useState(false);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [isSelectionModeActive, setIsSelectionModeActive] = useState(false);
+  const [selectedPagesFilter, setSelectedPagesFilter] = useState<string[]>([]);
+  const [isPageFilterDropdownOpen, setIsPageFilterDropdownOpen] = useState(false);
+  const [selectedLeadForPreview, setSelectedLeadForPreview] =
+    useState<any>(null);
+  const [whatsAppModalData, setWhatsAppModalData] =
+    useState<WhatsAppModalData | null>(null);
+  const [isCheckoutVisible, setIsCheckoutVisible] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+  const [dangerActionContext, setDangerActionContext] = useState<{
+    pageName?: string;
+    leadCount?: number;
+    docsToDelete?: import("firebase/firestore").QueryDocumentSnapshot<
+      import("firebase/firestore").DocumentData,
+      import("firebase/firestore").DocumentData
+    >[];
+    alertMessage?: string;
+  }>({});
+  const getTomorrowDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  };
+
+  const [dangerInputValue, setDangerInputValue] = useState("");
+  const [formData, setFormData] = useState({
+    name: "",
+    phone: "",
+    address: "",
+    area: "",
+    province: "Luanda",
+    customProvince: "",
+    observacoes: "",
+    quantity: 1,
+    deliveryDate: getTomorrowDate(),
+    deliveryPeriod: "Manhã (08:00 às 12:00)",
+  });
+
+  useEffect(() => {
+    if (view === "sales-camisa-seda") {
+      setFormData((prev) => ({
+        ...prev,
+        quantity: 3,
+        observacoes: "",
+      }));
+    } else if (view === "sales-cinta-colombiana") {
+      setFormData((prev) => ({
+        ...prev,
+        quantity: 1,
+        observacoes: "",
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        quantity: 1,
+        observacoes: "",
+      }));
+    }
+  }, [view]);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentLeadId, setCurrentLeadId] = useState<string | null>(null);
+
+  // Product Validation Goals State
+  const [productGoals, setProductGoals] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem("validaC_product_goals");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          "cinta-colombiana": 50,
+          "camisa-seda": 50,
+          "base-movel-360": 50,
+          "roteador-5g": 50,
+          "cabide-secador": 50,
+          "secador-uv": 50,
+        };
+  });
+  const [editingGoalProductId, setEditingGoalProductId] = useState<string | null>(null);
+  const [tempGoalInput, setTempGoalInput] = useState<number>(50);
+  const [pagesFilter, setPagesFilter] = useState<"all" | "active" | "inactive" | "validated" | "testing" | "stock">(() => {
+    try {
+      const saved = localStorage.getItem("validaC_pages_filter");
+      if (saved && ["all", "active", "inactive", "validated", "testing", "stock"].includes(saved)) {
+        return saved as "all" | "active" | "inactive" | "validated" | "testing" | "stock";
+      }
+    } catch (e) {
+      // fallback
+    }
+    return "active";
+  });
+
+  // Persist chosen pages filter across sessions
+  useEffect(() => {
+    try {
+      localStorage.setItem("validaC_pages_filter", pagesFilter);
+    } catch (e) {
+      // ignore
+    }
+  }, [pagesFilter]);
+
+  // Product Evolution Stages ("testing" = Pré-venda / Validação, "stock" = Encomendas em Stock / Entrega Imediata)
+  const [productStages, setProductStages] = useState<Record<string, "testing" | "stock">>(() => {
+    const saved = localStorage.getItem("validaC_product_stages");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          "cabide-secador": "stock",
+          "cinta-colombiana": "testing",
+          "camisa-seda": "testing",
+          "base-movel-360": "testing",
+          "roteador-5g": "testing",
+          "secador-uv": "testing",
+        };
+  });
+
+  // Active / Inactive Pages State
+  const [activePagesStatus, setActivePagesStatus] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem("validaC_active_pages");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          "secador-uv": true,
+          "cabide-secador": true,
+          "roteador-5g": true,
+          "base-movel-360": true,
+          "camisa-seda": true,
+        };
+  });
+
+  useEffect(() => {
+    const loadGoalsAndPagesFromFirestore = async () => {
+      try {
+        const snap = await getDoc(doc(db, "settings", "product_goals"));
+        if (snap.exists()) {
+          setProductGoals((prev) => ({ ...prev, ...snap.data() }));
+        }
+      } catch (err) {
+        console.log("Using cached product goals");
+      }
+      try {
+        const snap = await getDoc(doc(db, "settings", "active_pages"));
+        if (snap.exists()) {
+          setActivePagesStatus((prev) => ({ ...prev, ...snap.data() }));
+        }
+      } catch (err) {
+        console.log("Using cached active pages status");
+      }
+      try {
+        const snap = await getDoc(doc(db, "settings", "product_stages"));
+        if (snap.exists()) {
+          setProductStages((prev) => ({ ...prev, ...snap.data() }));
+        }
+      } catch (err) {
+        console.log("Using cached product stages");
+      }
+    };
+    loadGoalsAndPagesFromFirestore();
+  }, []);
+
+  const togglePageStatus = async (productId: string) => {
+    const currentStatus = activePagesStatus[productId] !== false; // default true
+    const updated = { ...activePagesStatus, [productId]: !currentStatus };
+    setActivePagesStatus(updated);
+    localStorage.setItem("validaC_active_pages", JSON.stringify(updated));
+    try {
+      await setDoc(doc(db, "settings", "active_pages"), updated, { merge: true });
+    } catch (err) {
+      console.log("Active page status saved locally");
+    }
+  };
+
+  const toggleProductStage = async (productId: string) => {
+    const current = (productStages[productId] === "stock" || productId === "cabide-secador") ? "stock" : "testing";
+    const next = current === "stock" ? "testing" : "stock";
+    const updated = { ...productStages, [productId]: next };
+    setProductStages(updated);
+    localStorage.setItem("validaC_product_stages", JSON.stringify(updated));
+    try {
+      await setDoc(doc(db, "settings", "product_stages"), updated, { merge: true });
+    } catch (err) {
+      console.log("Product stage saved locally");
+    }
+  };
+
+  const updateProductGoal = async (productId: string, newGoal: number) => {
+    const goalVal = Math.max(1, newGoal);
+    const updated = { ...productGoals, [productId]: goalVal };
+    setProductGoals(updated);
+    localStorage.setItem("validaC_product_goals", JSON.stringify(updated));
+    setEditingGoalProductId(null);
+    try {
+      await setDoc(doc(db, "settings", "product_goals"), updated, { merge: true });
+    } catch (err) {
+      console.log("Goal saved locally");
+    }
+  };
+
+  const normalizeProductName = (raw?: string): string => {
+    if (!raw) return "Secador Inteligente UV";
+    const lower = raw.toLowerCase().trim();
+
+    if (
+      lower.includes("cinta") ||
+      lower.includes("colombiana") ||
+      lower.includes("modeladora") ||
+      lower.includes("bodysuit")
+    ) {
+      return "Cinta Modeladora Colombiana";
+    }
+    if (
+      lower.includes("visor") ||
+      lower.includes("automóvel") ||
+      lower.includes("automovel") ||
+      lower.includes("encandeamento")
+    ) {
+      return "Visor Automóvel Anti-Encandeamento 2 em 1";
+    }
+    if (lower.includes("seda") || lower.includes("camisa")) {
+      return "Camisa Seda Gelada Premium";
+    }
+    if (
+      lower.includes("base") ||
+      lower.includes("móvel") ||
+      lower.includes("movel") ||
+      lower.includes("deslizador") ||
+      lower.includes("360")
+    ) {
+      return "Base Móvel 360°";
+    }
+    if (
+      lower.includes("roteador") ||
+      lower.includes("5g") ||
+      lower.includes("zte")
+    ) {
+      return "Roteador 5G Ultra Desbloqueado";
+    }
+    if (
+      lower.includes("roupa") ||
+      lower.includes("expresso") ||
+      lower.includes("cabide") ||
+      lower.includes("secador_roupa") ||
+      lower.includes("35000") ||
+      lower.includes("35 000") ||
+      lower.includes("34900") ||
+      lower.includes("34 900")
+    ) {
+      return "Secador Expresso Pro";
+    }
+    if (
+      lower.includes("inteligente") ||
+      lower.includes("secador uv") ||
+      lower.includes("secador de sapatos") ||
+      lower.includes("uv") ||
+      lower.includes("secador")
+    ) {
+      return "Secador Inteligente UV";
+    }
+
+    return raw;
+  };
+
+  const PRODUCTS_LIST = [
+    {
+      id: "visor-automovel",
+      title: "Visor Automóvel Anti-Encandeamento 2 em 1",
+      subtitle: "Acessório 2 em 1 com painéis dia e noite para maior conforto visual. 17.000 Kz.",
+      image: "https://i.postimg.cc/3JkCPrFR/main-image-1.webp",
+      viewName: "sales-visor-automovel",
+      paramName: "visor-automovel",
+      matchesLead: (l: any) => {
+        const p = normalizeProductName(l.produto || l.product || l.produtoName || l.rawProduto);
+        return p === "Visor Automóvel Anti-Encandeamento 2 em 1";
+      },
+    },
+    {
+      id: "cinta-colombiana",
+      title: "Cinta Modeladora Colombiana",
+      subtitle: "Bodysuit com compressão firme de abdómen, levanta-bumbum e renda elegante. 45.000 Kz.",
+      image: "https://i.postimg.cc/V6rjqL09/NUDE-CAFE-1.jpg",
+      viewName: "sales-cinta-colombiana",
+      paramName: "cinta-colombiana",
+      matchesLead: (l: any) => {
+        const p = normalizeProductName(l.produto || l.product || l.produtoName || l.rawProduto);
+        return p === "Cinta Modeladora Colombiana";
+      },
+    },
+    {
+      id: "camisa-seda",
+      title: "Camisa Seda Gelada Premium",
+      subtitle: "Camisa social premium em seda gelada tecnológica com efeito antirrugas. 25.000 Kz / Unidade.",
+      image: "https://i.postimg.cc/PJWtQHTd/C2128-5-azul-marinho.jpg",
+      viewName: "sales-camisa-seda",
+      paramName: "camisa-seda",
+      matchesLead: (l: any) => {
+        const p = normalizeProductName(l.produto || l.product || l.produtoName || l.rawProduto);
+        return p === "Camisa Seda Gelada Premium";
+      },
+    },
+    {
+      id: "base-movel-360",
+      title: "Base Móvel 360°",
+      subtitle: "Deslizador para fogões, geladeiras, máquinas de lavar e arcas. 15.000 Kz / Par.",
+      image: IMAGES_BASE_MOVEL[0],
+      viewName: "sales-base-movel",
+      paramName: "base-movel-360",
+      matchesLead: (l: any) => {
+        const p = normalizeProductName(l.produto || l.product || l.produtoName || l.rawProduto);
+        return p === "Base Móvel 360°";
+      },
+    },
+    {
+      id: "roteador-5g",
+      title: "Roteador 5G Ultra Desbloqueado",
+      subtitle: "Nova landing page focada em internet de alto desempenho.",
+      image: IMAGES_ROTEADOR[0],
+      viewName: "sales-roteador",
+      paramName: "roteador-5g",
+      matchesLead: (l: any) => {
+        const p = normalizeProductName(l.produto || l.product || l.produtoName || l.rawProduto);
+        return p === "Roteador 5G Ultra Desbloqueado";
+      },
+    },
+    {
+      id: "cabide-secador",
+      title: "Secador Expresso Pro",
+      subtitle: "Novo produto voltado a roupas húmidas e dias de chuva.",
+      image: IMAGES_ROUPAS[0],
+      viewName: "sales-roupas",
+      paramName: "cabide-secador",
+      matchesLead: (l: any) => {
+        const p = normalizeProductName(l.produto || l.product || l.produtoName || l.rawProduto);
+        return p === "Secador Expresso Pro" || p === "Secador Expresso Pro 35 000 Kz" || p === "Secador Expresso Pro 34 900 Kz" || p === "Secador Expresso Portátil";
+      },
+    },
+    {
+      id: "secador-uv",
+      title: "Secador Inteligente UV",
+      subtitle: "Oferta CPA padrão com formulário integrado. Conversão direta.",
+      image: IMAGES[0],
+      viewName: "sales",
+      paramName: "secador-uv",
+      matchesLead: (l: any) => {
+        const p = normalizeProductName(l.produto || l.product || l.produtoName || l.rawProduto);
+        return p === "Secador Inteligente UV";
+      },
+    },
+  ];
+
+  const getProductLeadStats = (productId: string) => {
+    const prod = PRODUCTS_LIST.find((p) => p.id === productId);
+    if (!prod) return { totalLeads: 0, totalReservas: 0, confirmedReservas: 0, reservasCount: 0, totalReservedUnits: 0 };
+    const matching = adminData.filter((l) => prod.matchesLead(l));
+    const confirmedList = matching.filter(
+      (l) => l.status && (l.status.includes("Reservado") || l.status === "Entregue" || l.status === "Pago")
+    );
+    const nonRejectedList = matching.filter((l) => l.status !== "Rejeitado" && l.status !== "Cancelado");
+    
+    // Active reservation leads
+    const activeLeads = confirmedList.length > 0 ? confirmedList : nonRejectedList;
+    
+    // Sum of product quantities reserved across leads
+    const calcQty = (l: any) => Number(l.quantity) || Number(l.qtd) || Number(l.quantidade) || 1;
+    const totalReservedUnits = activeLeads.reduce((sum, l) => sum + calcQty(l), 0);
+
+    return {
+      totalLeads: matching.length,
+      confirmedReservas: confirmedList.length,
+      reservasLeadCount: activeLeads.length,
+      reservasCount: totalReservedUnits, // Total quantity of units reserved
+      totalReservedUnits,
+    };
+  };
+
+  const getProductLeadCount = (productId: string) => {
+    return getProductLeadStats(productId).reservasCount;
+  };
+
+  const getProductValidationInfo = (productId: string) => {
+    const stats = getProductLeadStats(productId);
+    const goal = productGoals[productId] || 50;
+    const leadCount = stats.totalLeads;
+    const reservasCount = stats.reservasCount;
+    const confirmedReservas = stats.confirmedReservas;
+    const percent = Math.round((reservasCount / goal) * 100);
+    const isValidated = reservasCount >= goal;
+    const isInactive = activePagesStatus[productId] === false;
+    const isStockStage = productStages[productId] === "stock" || productId === "cabide-secador";
+
+    let statusKey: "stock" | "validated" | "testing" | "inactive" = "testing";
+    if (isInactive) {
+      statusKey = "inactive";
+    } else if (isStockStage) {
+      statusKey = "stock";
+    } else if (isValidated) {
+      statusKey = "validated";
+    } else {
+      statusKey = "testing";
+    }
+
+    return {
+      leadCount,
+      reservasCount,
+      confirmedReservas,
+      goal,
+      percent,
+      isValidated,
+      isInactive,
+      isStockStage,
+      statusKey,
+      badgeText: isInactive
+        ? "🔴 DESATIVADA"
+        : isStockStage
+        ? "📦 EM STOCK (ENCOMENDAS)"
+        : isValidated
+        ? "🟢 VALIDADO"
+        : reservasCount > 0
+        ? `🧪 EM TESTE (${percent}%)`
+        : "🧪 EM TESTE",
+      badgeClass: isInactive
+        ? "bg-rose-600 text-white font-black"
+        : isStockStage
+        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black shadow-md shadow-blue-500/20"
+        : isValidated
+        ? "bg-emerald-500 text-white font-black"
+        : reservasCount > 0
+        ? "bg-amber-500 text-slate-950 font-black"
+        : "bg-slate-500 text-white font-bold",
+    };
+  };
+
+  const isProductInStockStage = (productIdOrName: string): boolean => {
+    const norm = normalizeProductName(productIdOrName);
+    const foundProd = PRODUCTS_LIST.find(
+      (p) =>
+        p.id === productIdOrName ||
+        p.title === productIdOrName ||
+        p.paramName === productIdOrName ||
+        normalizeProductName(p.title) === norm,
+    );
+    if (foundProd) {
+      return productStages[foundProd.id] === "stock" || foundProd.id === "cabide-secador";
+    }
+    return norm === "Secador Expresso Pro";
+  };
+
+  const isStockLead = (lead: any): boolean => {
+    const norm = normalizeProductName(lead?.produto || lead?.product || lead?.produtoName || lead?.rawProduto);
+    return isProductInStockStage(norm) || !!lead?.deliveryDate || !!lead?.deliveryPeriod;
+  };
+
+  // Admin State
+  const [adminData, setAdminData] = useState<any[]>([]);
+  const [isAdminLoading, setIsAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState("");
+
+  // Refs for focusing inputs
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRoupasRef = useRef<HTMLInputElement>(null);
+
+  // Smooth scroll to checkout section and focus the Name input field
+  const handleScrollToCheckout = () => {
+    const checkoutElem = document.getElementById("comprar");
+    if (checkoutElem) {
+      checkoutElem.scrollIntoView({ behavior: "smooth" });
+      setTimeout(() => {
+        const nameInput = checkoutElem.querySelector<HTMLInputElement>(
+          'input[type="text"], input[id*="name"]'
+        );
+        if (nameInput) {
+          nameInput.focus();
+        } else if (nameInputRef.current) {
+          nameInputRef.current.focus();
+        } else if (nameInputRoupasRef.current) {
+          nameInputRoupasRef.current.focus();
+        }
+      }, 400);
+    }
+  };
+
+  // Admin Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [userName, setUserName] = useState("");
+  const [userStatus, setUserStatus] = useState<
+    "pending" | "approved" | "blocked" | "expired" | null
+  >(null);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Admin Filter State
+  const [searchTerm, setSearchTerm] = useState(
+    () => localStorage.getItem("validaC_searchTerm") || "",
+  );
+  const [filterStatus, setFilterStatus] = useState(
+    () => localStorage.getItem("validaC_filterStatus") || "Todos",
+  );
+  const [filterDate, setFilterDate] = useState(
+    () => localStorage.getItem("validaC_filterDate") || "",
+  );
+  const [filterProduct, setFilterProduct] = useState(
+    () => localStorage.getItem("validaC_filterProduct") || "",
+  );
+  const [timeRangeFilter, setTimeRangeFilter] = useState(
+    () => localStorage.getItem("validaC_timeRangeFilter") || "Tudo",
+  );
+  const [adminListTab, setAdminListTab] = useState<"geral" | "arquivados">(
+    () =>
+      (localStorage.getItem("validaC_adminListTab") as
+        | "geral"
+        | "arquivados") || "geral",
+  );
+  const [adminCurrentPage, setAdminCurrentPage] = useState(1);
+  const [adminSubView, setAdminSubView] = useState<AdminSubViewType>(() => {
+    const pathname = window.location.pathname.toLowerCase();
+    if (pathname === "/calculadora" || pathname === "/calculadora/") {
+      return "calculadora";
+    }
+    if (pathname === "/prospeccao" || pathname === "/prospeccao/") {
+      return "prospeccao";
+    }
+    if (pathname === "/meta" || pathname === "/meta/") {
+      return "meta";
+    }
+    return "leads";
+  });
+  const [selectedDrawerLead, setSelectedDrawerLead] = useState<any | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [crmProductFilter, setCrmProductFilter] = useState("Todos");
+  const crmAvailableProducts = useMemo(() => {
+    const list = Array.from(
+      new Set(
+        adminData
+          .map((d) => d.produto)
+          .filter(Boolean),
+      ),
+    );
+    if (list.length === 0) {
+      return [
+        "Secador Inteligente UV",
+        "Cinta Modeladora Colombiana",
+        "Camisa de Seda Masculina",
+        "Roteador 5G Ultra Desbloqueado",
+      ];
+    }
+    return list;
+  }, [adminData]);
+  const [theme, setTheme] = useState<"dark" | "light">(
+    () => (localStorage.getItem("validaC_theme") as "dark" | "light") || "dark",
+  );
+  const [activeDropdownLeadId, setActiveDropdownLeadId] = useState<
+    string | null
+  >(null);
+  const [hidePhones, setHidePhones] = useState<boolean>(() => {
+    return localStorage.getItem("validaC_hidePhones") === "true";
+  });
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("validaC_hidePhones", String(hidePhones));
+  }, [hidePhones]);
+  const isDark =
+    theme === "dark" &&
+    [
+      "admin",
+      "pages",
+      "danger-zone",
+      "ai-generator",
+      "settings",
+      "prompt-gallery",
+      "users",
+    ].includes(view);
+
+  useEffect(() => {
+    localStorage.setItem("validaC_theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("validaC_searchTerm", searchTerm);
+    localStorage.setItem("validaC_filterStatus", filterStatus);
+    localStorage.setItem("validaC_filterDate", filterDate);
+    localStorage.setItem("validaC_filterProduct", filterProduct);
+    localStorage.setItem("validaC_timeRangeFilter", timeRangeFilter);
+    localStorage.setItem("validaC_adminListTab", adminListTab);
+    setAdminCurrentPage(1);
+  }, [
+    searchTerm,
+    filterStatus,
+    filterDate,
+    filterProduct,
+    timeRangeFilter,
+    adminListTab,
+  ]);
+
+  // Gallery State
+  const [activeImage, setActiveImage] = useState(0);
+
+  // Popup State
+  const [activePopup, setActivePopup] = useState<any>(null);
+
+  // Global Settings State
+  const [appSettings, setAppSettings] = useState<{
+    fbPixel?: string;
+    googleTag?: string;
+    whatsappOrderPhone?: string;
+  }>({
+    whatsappOrderPhone: "921167980",
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        let settingsDoc;
+        try {
+          settingsDoc = await getDoc(doc(db, "settings", "global"));
+        } catch (offlineErr: any) {
+          console.warn("Firestore offline or unavailable, trying cache:", offlineErr.message);
+          try {
+            settingsDoc = await getDocFromCache(doc(db, "settings", "global"));
+          } catch (cacheErr) {
+            settingsDoc = null;
+          }
+        }
+        if (settingsDoc && settingsDoc.exists()) {
+          const data = settingsDoc.data();
+          const merged = {
+            whatsappOrderPhone: "921167980",
+            ...data,
+          };
+          setAppSettings(merged);
+          localStorage.setItem("validaC_app_settings", JSON.stringify(merged));
+        } else {
+          // If doc not found, try localStorage
+          const cached = localStorage.getItem("validaC_app_settings");
+          if (cached) {
+            setAppSettings({
+              whatsappOrderPhone: "921167980",
+              ...JSON.parse(cached),
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching settings:", err);
+        const cached = localStorage.getItem("validaC_app_settings");
+        if (cached) {
+          try {
+            setAppSettings({
+              whatsappOrderPhone: "921167980",
+              ...JSON.parse(cached),
+            });
+          } catch (e) {
+            console.error("Error parsing cached settings:", e);
+          }
+        }
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  useEffect(() => {
+    if (!isSalesView) return;
+
+    setTimeLeft(600); // 10 minutes
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 0) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [view]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathname = window.location.pathname.toLowerCase();
+      if (pathname === "/admin" || pathname === "/admin/") {
+        setView("admin");
+      } else if (pathname === "/calculadora" || pathname === "/calculadora/") {
+        setView("admin");
+        setAdminSubView("calculadora");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("validaC_current_view", view);
+
+    if (view === "admin" && adminSubView === "calculadora") {
+      document.title = "Calculadora de Saldos de Cartões - Valida C";
+      if (window.location.pathname !== "/calculadora") {
+        window.history.pushState({}, "", "/calculadora");
+      }
+      return;
+    } else if (view === "admin") {
+      document.title = "Administração - Valida C";
+      if (window.location.pathname !== "/admin") {
+        window.history.pushState({}, "", "/admin");
+      }
+      return;
+    } else if (
+      (window.location.pathname === "/calculadora" || window.location.pathname === "/admin") &&
+      view !== "admin"
+    ) {
+      window.history.pushState({}, "", "/");
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (view === "sales-visor-automovel") {
+      params.set("product", "visor-automovel");
+      document.title = "Visor Automóvel Anti-Encandeamento 2 em 1 | 17.000 Kz";
+    } else if (view === "sales-cinta-colombiana") {
+      params.set("product", "cinta-colombiana");
+      document.title = "Cinta Modeladora Colombiana — C Store Angola";
+    } else if (view === "sales") {
+      params.set("product", "secador-uv");
+      document.title = "Secador Inteligente UV - Reserva Premium";
+    } else if (view === "sales-roupas") {
+      params.set("product", "cabide-secador");
+      document.title = "Secador Expresso Pro - C Store Angola";
+      setFormData((prev) => ({ ...prev, province: "Luanda", customProvince: "" }));
+    } else if (view === "sales-roteador") {
+      params.set("product", "roteador-5g");
+      document.title = "Roteador 5G Ultra Desbloqueado - C Store Angola";
+    } else if (view === "sales-base-movel") {
+      params.set("product", "base-movel-360");
+      document.title = "Base Móvel 360° — Deslizador para Máquina e Geladeira";
+    } else if (view === "sales-camisa-seda") {
+      params.set("product", "camisa-seda");
+      document.title = "Camisa de Seda Gelada Premium — C Store Angola";
+    } else if (
+      view === "admin" ||
+      view === "pages" ||
+      view === "danger-zone" ||
+      view === "users"
+    ) {
+      params.delete("product");
+      document.title = "Administração - Valida C";
+    } else {
+      params.delete("product");
+      document.title = "Valida C - Plataforma de Vendas";
+    }
+    const newUrl = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}`;
+    window.history.replaceState({}, "", newUrl);
+  }, [view, adminSubView]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        // Load user DB object to check status
+        try {
+          let userDoc;
+          try {
+            userDoc = await getDoc(doc(db, "users", user.uid));
+          } catch (offlineErr: any) {
+            console.warn("Firestore offline, trying user document cache:", offlineErr.message);
+            try {
+              userDoc = await getDocFromCache(doc(db, "users", user.uid));
+            } catch (cacheErr) {
+              userDoc = null;
+            }
+          }
+
+          if (!isMounted) return;
+
+          if (userDoc && userDoc.exists()) {
+            const data = userDoc.data();
+            let finalStatus = data.status || "pending";
+            const finalName = data.name || user.displayName || "";
+            setUserName(finalName);
+
+            if (
+              user.email === "exportacoes.extras@gmail.com" ||
+              user.email?.toLowerCase() === "grupocassaminha@gmail.com" ||
+              user.email?.toLowerCase() === "grupocasssaminha@gmail.com"
+            ) {
+              finalStatus = "approved";
+            }
+
+            // Check expiration if pending
+            if (finalStatus === "pending" && data.trialExpiresAt) {
+              const now = new Date();
+              const exp = typeof data.trialExpiresAt.toDate === "function" ? data.trialExpiresAt.toDate() : new Date(data.trialExpiresAt);
+              if (now > exp) finalStatus = "expired";
+            }
+
+            setUserStatus(finalStatus as any);
+            // Cache in localStorage
+            localStorage.setItem(`validaC_user_status_${user.uid}`, finalStatus);
+            localStorage.setItem(`validaC_user_name_${user.uid}`, finalName);
+          } else {
+            // Document doesn't exist or cache missed
+            // Let's check localStorage cache first
+            const cachedStatus = localStorage.getItem(`validaC_user_status_${user.uid}`);
+            const cachedName = localStorage.getItem(`validaC_user_name_${user.uid}`);
+            if (cachedStatus) {
+              setUserStatus(cachedStatus as any);
+              setUserName(cachedName || user.displayName || "");
+            } else {
+              setUserName(user.displayName || "");
+              let finalStatus = "pending";
+              if (
+                user.email === "exportacoes.extras@gmail.com" ||
+                user.email?.toLowerCase() === "grupocassaminha@gmail.com" ||
+                user.email?.toLowerCase() === "grupocasssaminha@gmail.com"
+              ) {
+                finalStatus = "approved";
+              }
+              setUserStatus(finalStatus as any);
+              localStorage.setItem(`validaC_user_status_${user.uid}`, finalStatus);
+              localStorage.setItem(`validaC_user_name_${user.uid}`, user.displayName || "");
+            }
+          }
+        } catch (e: any) {
+          if (!isMounted) return;
+          console.error("Error fetching user status:", e);
+          const cachedStatus = localStorage.getItem(`validaC_user_status_${user.uid}`);
+          const cachedName = localStorage.getItem(`validaC_user_name_${user.uid}`);
+          if (cachedStatus) {
+            setUserStatus(cachedStatus as any);
+            setUserName(cachedName || user.displayName || "");
+          } else {
+            setUserName(user.displayName || "");
+            if (
+              user.email === "exportacoes.extras@gmail.com" ||
+              user.email?.toLowerCase() === "grupocassaminha@gmail.com" ||
+              user.email?.toLowerCase() === "grupocasssaminha@gmail.com"
+            ) {
+              setUserStatus("approved");
+            } else {
+              setUserStatus("pending");
+            }
+          }
+        }
+      } else {
+        setIsAuthenticated(false);
+        setUserStatus(null);
+        setUserName("");
+      }
+      setIsAuthLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      (view === "admin" ||
+        view === "pages" ||
+        view === "danger-zone" ||
+        view === "users")
+    ) {
+      loadAdminData();
+      try {
+        const q = query(collection(db, "leads"));
+        const unsubscribe = onSnapshot(
+          q,
+          (snapshot) => {
+            const leads = snapshot.docs.map((doc) => {
+              let ts = doc.data().timestamp || null;
+              try {
+                if (
+                  doc.data().createdAt?.toDate &&
+                  typeof doc.data().createdAt.toDate === "function"
+                ) {
+                  ts = doc.data().createdAt.toDate().toISOString();
+                } else if (typeof doc.data().createdAt === "string") {
+                  ts = doc.data().createdAt;
+                }
+              } catch (e) {
+                console.error("Erro na data", e);
+              }
+
+              const rawProduto = doc.data().produto || doc.data().product || doc.data().produtoName || "";
+              const normalizedProduto = normalizeProductName(rawProduto);
+
+              let vLevel = 0;
+              if (typeof doc.data().verificationLevel === "number") {
+                vLevel = doc.data().verificationLevel;
+              } else if (doc.data().doubleCheck || doc.data().verified2x) {
+                vLevel = 2;
+              } else if (doc.data().singleCheck || doc.data().verified1x) {
+                vLevel = 1;
+              }
+
+              try {
+                const cache = JSON.parse(localStorage.getItem("verified_leads_cache") || "{}");
+                if (cache[doc.id] !== undefined) {
+                  const cachedVal = cache[doc.id];
+                  if (typeof cachedVal === "number") {
+                    vLevel = cachedVal;
+                  } else if (typeof cachedVal === "boolean") {
+                    vLevel = cachedVal ? 2 : 0;
+                  }
+                }
+              } catch (e) {}
+
+              return {
+                id: doc.id,
+                ...doc.data(),
+                verificationLevel: vLevel,
+                doubleCheck: vLevel === 2,
+                verified2x: vLevel === 2,
+                verified1x: vLevel >= 1,
+                produto: normalizedProduto,
+                rawProduto: rawProduto,
+                timestamp: ts,
+              };
+            });
+
+            leads.sort((a, b) => {
+              if (!a.timestamp) return 1;
+              if (!b.timestamp) return -1;
+              return (
+                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+              );
+            });
+            setAdminData(leads);
+            setIsAdminLoading(false);
+          },
+          (err) => {
+            console.error("Snapshot error:", err);
+          }
+        );
+        return () => unsubscribe();
+      } catch (err) {
+        console.error("Error setting up leads listener:", err);
+      }
+    }
+  }, [view, isAuthenticated]);
+
+  useEffect(() => {
+    if (
+      view !== "sales" &&
+      view !== "sales-roupas" &&
+      view !== "sales-roteador" &&
+      view !== "sales-base-movel" &&
+      view !== "sales-camisa-seda" &&
+      view !== "sales-cinta-colombiana"
+    )
+      return;
+
+    const handleScroll = () => {
+      const comprarEl = document.getElementById("comprar");
+      if (comprarEl) {
+        const rect = comprarEl.getBoundingClientRect();
+        // Visible when top is less than viewport height (with a small buffer so it doesn't disappear too early)
+        // and bottom is greater than 0
+        if (rect.top < window.innerHeight - 50 && rect.bottom > 0) {
+          setIsCheckoutVisible(true);
+        } else {
+          setIsCheckoutVisible(false);
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [view]);
+
+  useEffect(() => {
+    if (
+      view === "sales" ||
+      view === "sales-roupas" ||
+      view === "sales-roteador" ||
+      view === "sales-base-movel" ||
+      view === "sales-camisa-seda" ||
+      view === "sales-cinta-colombiana"
+    ) {
+      const produtoName =
+        view === "sales-cinta-colombiana"
+          ? "Cinta Modeladora Colombiana"
+          : view === "sales-roupas"
+            ? "Secador Expresso Pro"
+            : view === "sales-roteador"
+              ? "Roteador 5G Ultra Desbloqueado"
+              : view === "sales-base-movel"
+                ? "Base Móvel 360°"
+                : view === "sales-camisa-seda"
+                  ? "Camisa Seda Gelada Premium"
+                  : "Secador Inteligente UV";
+      initTracking(produtoName, appSettings);
+
+      const imagesList =
+        view === "sales-roupas"
+          ? IMAGES_ROUPAS
+          : view === "sales-roteador"
+            ? IMAGES_ROTEADOR
+            : view === "sales-base-movel"
+              ? IMAGES_BASE_MOVEL
+              : IMAGES;
+
+      if (view !== "sales-camisa-seda" && view !== "sales-cinta-colombiana") {
+        const timer = setInterval(() => {
+          setActiveImage((prev) => (prev + 1) % imagesList.length);
+        }, 4000);
+        return () => clearInterval(timer);
+      }
+    }
+  }, [view, appSettings]);
+
+  useEffect(() => {
+    if (
+      view !== "sales" &&
+      view !== "sales-roupas" &&
+      view !== "sales-roteador" &&
+      view !== "sales-base-movel" &&
+      view !== "sales-camisa-seda" &&
+      view !== "sales-cinta-colombiana"
+    )
+      return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const buyersPool = view === "sales-cinta-colombiana" ? RECENT_BUYERS_CINTA : RECENT_BUYERS;
+
+    const scheduleNext = () => {
+      // Show every 12 to 25 seconds randomly
+      const delay = 12000 + Math.random() * 13000;
+      timeoutId = setTimeout(() => {
+        const randomBuyer =
+          buyersPool[Math.floor(Math.random() * buyersPool.length)];
+        setActivePopup(randomBuyer);
+
+        setTimeout(() => {
+          setActivePopup(null);
+          scheduleNext();
+        }, 5000); // Display for 5 seconds
+      }, delay);
+    };
+
+    // Initial popup after 3 seconds
+    timeoutId = setTimeout(() => {
+      const initialBuyer = buyersPool[0];
+      setActivePopup(initialBuyer);
+      setTimeout(() => {
+        setActivePopup(null);
+        scheduleNext();
+      }, 5000);
+    }, 3000);
+
+    return () => clearTimeout(timeoutId);
+  }, [view]);
+
+  // ----------------------------------------------------
+  // Sales Logic
+  // ----------------------------------------------------
+  const handleFormSubmit = async (
+    e: React.FormEvent,
+    selectedColor?: string,
+    selectedSize?: string
+  ) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const produtoName =
+      view === "sales-visor-automovel"
+        ? "Visor Automóvel Anti-Encandeamento 2 em 1"
+        : view === "sales-cinta-colombiana"
+          ? "Cinta Modeladora Colombiana"
+          : view === "sales-roupas"
+            ? "Secador Expresso Pro"
+            : view === "sales-roteador"
+              ? "Roteador 5G Ultra Desbloqueado"
+              : view === "sales-base-movel"
+                ? "Base Móvel 360°"
+                : view === "sales-camisa-seda"
+                  ? "Camisa Seda Gelada Premium"
+                  : "Secador Inteligente UV";
+    const pricePerUnit =
+      view === "sales-visor-automovel"
+        ? 17000
+        : view === "sales-cinta-colombiana"
+          ? 45000
+          : view === "sales-roupas"
+            ? 35000
+            : view === "sales-roteador"
+              ? 240000
+              : view === "sales-base-movel"
+                ? 15000
+                : view === "sales-camisa-seda"
+                  ? 35000
+                  : 25000;
+
+    let computedTotal = formData.quantity * pricePerUnit;
+    if (view === "sales-visor-automovel") {
+      if (formData.quantity === 1) computedTotal = 17000;
+      else if (formData.quantity === 2) computedTotal = 30000;
+      else if (formData.quantity === 3) computedTotal = 44000;
+      else computedTotal = formData.quantity * 17000;
+    } else if (view === "sales-camisa-seda") {
+      if (formData.quantity === 1) computedTotal = 35000;
+      else if (formData.quantity === 2) computedTotal = 60000;
+      else if (formData.quantity === 3) computedTotal = 86000;
+      else if (formData.quantity === 5) computedTotal = 140000;
+    } else if (view === "sales-cinta-colombiana") {
+      if (formData.quantity === 1) computedTotal = 45000;
+      else if (formData.quantity === 2) computedTotal = 80000;
+      else if (formData.quantity === 3) computedTotal = 110000;
+    }
+
+    const tempLead = {
+      name: formData.name,
+      phone: formData.phone,
+      address: formData.area || "", // Bairro/Zona/Município mapping
+      province:
+        view === "sales-roupas"
+          ? "Luanda"
+          : formData.province === "Outra"
+            ? formData.customProvince
+            : formData.province,
+      area: formData.area || "", // Bairro/Zona
+      deliveryDate: formData.deliveryDate || "",
+      deliveryPeriod: formData.deliveryPeriod || "Manhã (08:00 às 12:00)",
+      periodo: formData.deliveryPeriod || "Manhã (08:00 às 12:00)",
+      observacoes: selectedColor && selectedSize
+        ? selectedColor.includes("Unidade ")
+          ? `${formData.quantity || 1} ${(formData.quantity || 1) === 1 ? "Unidade" : "Unidades"} | ${selectedColor}${formData.observacoes ? ` | Obs: ${formData.observacoes}` : ""}`
+          : `1 Unidade | Cor: ${selectedColor} | Tamanho: ${selectedSize}${formData.observacoes ? ` | Obs: ${formData.observacoes}` : ""}`
+        : formData.observacoes,
+      produto: produtoName,
+      totalPrice: computedTotal,
+      quantity: formData.quantity,
+      status: "Pendente",
+      timestamp: new Date().toISOString(),
+      createdAt: serverTimestamp(),
+      ...(selectedColor ? { cor: selectedColor } : {}),
+      ...(selectedSize ? { tamanho: selectedSize } : {}),
+    };
+
+    setLastSubmittedLead({
+      name: formData.name,
+      phone: formData.phone,
+      address: formData.area || "",
+      province:
+        view === "sales-roupas"
+          ? "Luanda"
+          : formData.province === "Outra"
+            ? formData.customProvince
+            : formData.province,
+      area: formData.area || "",
+      quantity: formData.quantity,
+      deliveryDate: formData.deliveryDate || "",
+      deliveryPeriod: formData.deliveryPeriod || "Manhã (08:00 às 12:00)",
+      color: selectedColor,
+      size: selectedSize,
+      totalPrice: computedTotal,
+      productName: produtoName,
+    });
+
+    // Abrir o pop-up de confirmação IMEDIATAMENTE (processamento instantâneo)
+    setIsSubmitting(false);
+    setModalState("step1");
+
+    // Salvar no Firestore em segundo plano
+    addDoc(collection(db, "leads"), tempLead)
+      .then((docRef) => {
+        setCurrentLeadId(docRef.id);
+        trackEvent(produtoName, "generate_lead", "Lead", appSettings);
+      })
+      .catch((err: any) => {
+        if (
+          err instanceof Error &&
+          err.message.includes("missing or insufficient permissions")
+        ) {
+          handleFirestoreError(err, OperationType.CREATE, "leads");
+        }
+        console.error("Erro ao salvar lead em segundo plano:", err);
+      });
+  };
+
+  const processReservation = async (isAccepted: boolean) => {
+    setModalState("none");
+
+    const produtoName =
+      view === "sales-visor-automovel"
+        ? "Visor Automóvel Anti-Encandeamento 2 em 1"
+        : view === "sales-cinta-colombiana"
+          ? "Cinta Modeladora Colombiana"
+          : view === "sales-roupas"
+            ? "Secador Expresso Pro"
+            : view === "sales-roteador"
+              ? "Roteador 5G Ultra Desbloqueado"
+              : view === "sales-base-movel"
+                ? "Base Móvel 360°"
+                : view === "sales-camisa-seda"
+                  ? "Camisa Seda Gelada Premium"
+                  : "Secador Inteligente UV";
+
+    if (isAccepted) {
+      setTimeout(() => setModalState("success"), 300);
+
+      // Disparar Eventos Customizados (Reservado com sucesso)
+      trackEvent(produtoName, "add_to_cart", "AddToCart", appSettings);
+      trackEvent(
+        produtoName,
+        "complete_registration",
+        "CompleteRegistration",
+        appSettings,
+      );
+      trackEvent(produtoName, "subscribe", "Subscribe", appSettings);
+    } else {
+      setTimeout(() => setModalState("rejected"), 300);
+    }
+
+    if (currentLeadId) {
+      try {
+        await updateDoc(doc(db, "leads", currentLeadId), {
+          status: isAccepted ? "Reservado" : "Rejeitado",
+        });
+      } catch (err: any) {
+        if (
+          err instanceof Error &&
+          err.message.includes("missing or insufficient permissions")
+        ) {
+          handleFirestoreError(
+            err,
+            OperationType.UPDATE,
+            `leads/${currentLeadId}`,
+          );
+        }
+        console.error("Erro ao atualizar lead:", err);
+      }
+    }
+  };
+
+  const closeModal = () => {
+    setModalState("none");
+    setFormData({
+      name: "",
+      phone: "",
+      address: "",
+      area: "",
+      province: "Luanda",
+      customProvince: "",
+      observacoes: "",
+      quantity: 1,
+      deliveryDate: getTomorrowDate(),
+      deliveryPeriod: "Manhã (08:00 às 12:00)",
+    });
+  };
+
+  // ----------------------------------------------------
+  // Admin Logic
+  // ----------------------------------------------------
+  const handleForgotPassword = async () => {
+    if (!loginEmail) {
+      setLoginError(
+        "Por favor, introduza o seu email no campo acima para recuperar a senha.",
+      );
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, loginEmail);
+      alert("Link de recuperação enviado! Verifique o seu email.");
+    } catch (err: any) {
+      setLoginError("Erro ao recuperar senha: " + err.message);
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!auth.currentUser) return;
+
+    try {
+      if (profileFormData.name !== auth.currentUser.displayName) {
+        await updateProfile(auth.currentUser, {
+          displayName: profileFormData.name,
+        });
+      }
+
+      if (
+        profileFormData.email !== auth.currentUser.email &&
+        profileFormData.email.trim() !== ""
+      ) {
+        await updateEmail(auth.currentUser, profileFormData.email);
+      }
+
+      if (profileFormData.password.trim() !== "") {
+        await updatePassword(auth.currentUser, profileFormData.password);
+      }
+
+      alert("Perfil atualizado com sucesso!");
+      setModalState("none");
+    } catch (err: any) {
+      if (err.code === "auth/requires-recent-login") {
+        alert(
+          "Por motivos de segurança, deverá terminar sessão e voltar a entrar antes de atualizar dados sensíveis.",
+        );
+      } else {
+        alert("Erro ao atualizar perfil: " + err.message);
+      }
+    }
+  };
+
+  const openProfileModal = () => {
+    setProfileFormData({
+      name: auth.currentUser?.displayName || "Pedro",
+      email: auth.currentUser?.email || "",
+      password: "",
+    });
+    setModalState("profile");
+  };
+
+  const handlePasswordChange = async () => {
+    const newPass = prompt("Digite a nova senha para o seu painel:");
+    if (!newPass || newPass.trim() === "") return;
+    try {
+      if (auth.currentUser) {
+        await updatePassword(auth.currentUser, newPass);
+        alert("Senha alterada com sucesso!");
+      }
+    } catch (err: any) {
+      if (err.code === "auth/requires-recent-login") {
+        alert(
+          "Por motivos de segurança, deverá terminar sessão e voltar a entrar antes de alterar a senha.",
+        );
+      } else {
+        alert("Erro ao alterar senha: " + err.message);
+      }
+    }
+  };
+
+  const toggleAdmin = () => {
+    if (view === "admin") {
+      setView("sales");
+    } else {
+      setView("admin");
+      if (isAuthenticated) {
+        loadAdminData();
+      }
+    }
+  };
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setIsAdminLoading(true);
+
+    try {
+      if (
+        loginEmail.toLowerCase() === "grupocassaminha@gmail.com" ||
+        loginEmail.toLowerCase() === "grupocasssaminha@gmail.com"
+      ) {
+        try {
+          await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+        } catch (authErr: any) {
+          if (
+            authErr.code === "auth/user-not-found" ||
+            authErr.code === "auth/invalid-login-credentials" ||
+            authErr.code === "auth/invalid-credential"
+          ) {
+            // If the user doesn't exist, we create it. Warning: Production apps should handle this differently
+            try {
+              const userCredential = await createUserWithEmailAndPassword(
+                auth,
+                loginEmail,
+                loginPassword,
+              );
+              const user = userCredential.user;
+              await updateProfile(user, { displayName: "Pedro Cassaminha" });
+              // Criar doc do utilizador admin
+              await setDoc(doc(db, "users", user.uid), {
+                id: user.uid,
+                name: "Pedro Cassaminha",
+                email: loginEmail,
+                phone: "",
+                role: "admin",
+                status: "approved",
+                createdAt: serverTimestamp(),
+              }).catch((err) =>
+                console.error("Could not create user document", err),
+              );
+            } catch (createErr: any) {
+              setLoginError(
+                "Erro ao criar conta: " +
+                  (createErr.message || "Erro desconhecido"),
+              );
+              setIsAdminLoading(false);
+              return;
+            }
+          } else {
+            setLoginError(
+              "Erro ao fazer login: " +
+                (authErr.message || "Credenciais inválidas."),
+            );
+            setIsAdminLoading(false);
+            return;
+          }
+        }
+        setIsAuthenticated(true);
+        loadAdminData();
+      } else {
+        setLoginError("Endereço de e-mail não autorizado.");
+      }
+    } catch (err) {
+      setLoginError("Ocorreu um erro ao fazer login.");
+    }
+    setIsAdminLoading(false);
+  };
+
+  const loadAdminData = async () => {
+    setIsAdminLoading(true);
+    setAdminError("");
+
+    try {
+      const q = query(collection(db, "leads"));
+      const snapshot = await getDocs(q);
+      const leads = snapshot.docs.map((doc) => {
+        let ts = doc.data().timestamp || null;
+        try {
+          if (
+            doc.data().createdAt?.toDate &&
+            typeof doc.data().createdAt.toDate === "function"
+          ) {
+            ts = doc.data().createdAt.toDate().toISOString();
+          } else if (typeof doc.data().createdAt === "string") {
+            ts = doc.data().createdAt;
+          }
+        } catch (e) {
+          console.error("Erro na data", e);
+        }
+
+        const rawProduto = doc.data().produto || doc.data().product || doc.data().produtoName || "";
+        const normalizedProduto = normalizeProductName(rawProduto);
+
+        let vLevel = 0;
+        if (typeof doc.data().verificationLevel === "number") {
+          vLevel = doc.data().verificationLevel;
+        } else if (doc.data().doubleCheck || doc.data().verified2x) {
+          vLevel = 2;
+        } else if (doc.data().singleCheck || doc.data().verified1x) {
+          vLevel = 1;
+        }
+
+        try {
+          const cache = JSON.parse(localStorage.getItem("verified_leads_cache") || "{}");
+          if (cache[doc.id] !== undefined) {
+            const cachedVal = cache[doc.id];
+            if (typeof cachedVal === "number") {
+              vLevel = cachedVal;
+            } else if (typeof cachedVal === "boolean") {
+              vLevel = cachedVal ? 2 : 0;
+            }
+          }
+        } catch (e) {}
+
+        return {
+          id: doc.id,
+          ...doc.data(),
+          verificationLevel: vLevel,
+          doubleCheck: vLevel === 2,
+          verified2x: vLevel === 2,
+          verified1x: vLevel >= 1,
+          produto: normalizedProduto,
+          rawProduto: rawProduto,
+          timestamp: ts,
+        };
+      });
+      // Sort locally by timestamp descending
+      leads.sort((a, b) => {
+        if (!a.timestamp) return 1;
+        if (!b.timestamp) return -1;
+        return (
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+      });
+      setAdminData(leads);
+    } catch (err: any) {
+      console.error("Error fetching leads:", err);
+      if (err instanceof Error && err.message.includes("Index")) {
+        setAdminError(
+          "O banco de dados está a ser indexado. Por favor, tente novamente em alguns minutos.",
+        );
+      } else {
+        setAdminError(
+          "Erro na comunicação com a base de dados: " + (err.message || ""),
+        );
+      }
+    } finally {
+      setIsAdminLoading(false);
+    }
+  };
+
+  const formatKz = (value: number) => {
+    return (
+      new Intl.NumberFormat("pt-AO", {
+        style: "decimal",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(value) + " Kz"
+    );
+  };
+
+  const getLeadPrice = (lead: any) => {
+    if (!lead) return 0;
+    const q = lead.quantity || 1;
+    const prod = (lead.produto || "").toLowerCase();
+    const isCamisaSeda = prod.includes("seda") || prod.includes("camisa");
+    const unitPrice =
+      prod.includes("35000") ||
+      prod.includes("35 000") ||
+      prod.includes("expresso") ||
+      isCamisaSeda
+        ? 35000
+        : prod.includes("base") || prod.includes("móvel") || prod.includes("movel")
+          ? 15000
+          : 25000;
+
+    if (typeof lead.totalPrice === "number" && lead.totalPrice > 0) {
+      if (isCamisaSeda) {
+        return lead.totalPrice;
+      }
+      if (lead.totalPrice < q * unitPrice) {
+        return q * unitPrice;
+      }
+      return lead.totalPrice;
+    }
+    return q * unitPrice;
+  };
+
+  const getCleanObservacoes = (lead: any): string => {
+    if (!lead) return "";
+    const rawObs = (lead.observacoes || "").trim();
+    const qty = lead.quantity || 1;
+
+    if (!rawObs) {
+      const parts = [];
+      parts.push(`${qty} ${qty === 1 ? "Unidade" : "Unidades"}`);
+      if (lead.cor) parts.push(`Cor: ${lead.cor}`);
+      if (lead.tamanho) parts.push(`Tamanho: ${lead.tamanho}`);
+      return parts.join(" | ");
+    }
+
+    // Extra user note (e.g. "| Obs: ...")
+    let userNote = "";
+    let baseObs = rawObs;
+    const noteMatch = rawObs.match(/\|\s*Obs:\s*(.+)$/i);
+    if (noteMatch) {
+      userNote = noteMatch[1].trim();
+      baseObs = rawObs.substring(0, noteMatch.index).trim();
+    }
+
+    // Find all clothing sizes mentioned in order
+    const sizeRegex = /\b(6XL|5XL|4XL|3XL|2XL|XL|L|M|S|XS)\b/gi;
+    const matches = Array.from(baseObs.matchAll(sizeRegex));
+    const sizesFound = matches.map((m) => m[1].toUpperCase());
+
+    // Check for multi-unit pattern: "Unidade 1:", "Unidade 2:", etc.
+    const unitMatches = Array.from(baseObs.matchAll(/Unidade\s*(\d+)[:\s]*([^(|]+)(?:\(([^)]+)\))?/gi));
+
+    if (unitMatches.length >= 2 && qty > 1) {
+      const formattedUnits = unitMatches.map((m, idx) => {
+        const uNum = m[1] || `${idx + 1}`;
+        let uColor = m[2] ? m[2].replace(/^Cor:\s*/i, "").trim() : "";
+        let uSize = m[3] ? m[3].replace(/Tamanho\s*/i, "").trim().toUpperCase() : "";
+
+        if (!uSize && sizesFound[idx]) {
+          uSize = sizesFound[idx];
+        }
+
+        return `Unidade ${uNum}: ${uColor}${uSize ? ` (${uSize})` : ""}`;
+      });
+
+      let res = `${qty} Unidades | ${formattedUnits.join(" | ")}`;
+      if (userNote) res += ` | Obs: ${userNote}`;
+      return res;
+    }
+
+    // Single unit case
+    // The LAST size mentioned in the string is the true final selected size!
+    const lastSelectedSize = sizesFound.length > 0 ? sizesFound[sizesFound.length - 1] : (lead.tamanho || "");
+
+    // Extract color
+    let color = lead.cor || "";
+    if (!color) {
+      const colorMatch = baseObs.match(/(?:Cor|Unidade\s*\d+)[:\s]+([^(|]+)/i);
+      if (colorMatch) {
+        color = colorMatch[1]
+          .replace(/^Cor:\s*/i, "")
+          .replace(/^Unidade\s*\d+:\s*/i, "")
+          .trim();
+      }
+    }
+    color = color.replace(/^Unidade\s*\d+[:\s]*/gi, "").replace(/^Cor[:\s]*/gi, "").trim();
+
+    const parts = [];
+    parts.push(`${qty} ${qty === 1 ? "Unidade" : "Unidades"}`);
+    if (color) parts.push(`Cor: ${color}`);
+    if (lastSelectedSize) parts.push(`Tamanho: ${lastSelectedSize}`);
+    if (userNote) parts.push(`Obs: ${userNote}`);
+
+    return parts.join(" | ");
+  };
+
+  const getFormattedLeadText = (lead: any) => {
+    const q = lead.quantity || 1;
+    const product = lead.produto || "Secador Inteligente UV";
+    const total = formatKz(getLeadPrice(lead));
+    const mainProvince = lead.province || "Luanda";
+    const mainArea = lead.area || lead.address || "N/A";
+    const cleanObs = getCleanObservacoes(lead);
+    const obs = cleanObs ? `\nObservações: ${cleanObs}` : "";
+
+    return `Cliente: ${lead.name}\ntelefone: ${lead.phone}\nProdutos: ${q} - ${product}\nProvíncia: ${mainProvince}\nEndereço: ${mainArea}\nTotal: ${total}${obs}.`;
+  };
+
+  const getProductPageUrl = (lead: any): string => {
+    const rawProd = lead?.produto || lead?.product || lead?.produtoName || lead?.rawProduto;
+    const norm = normalizeProductName(rawProd);
+
+    // Secador Expresso Pro e Secadores -> Redireciona diretamente para a página de vendas oficial na loja
+    if (
+      norm === "Secador Expresso Pro" ||
+      norm.includes("Expresso") ||
+      norm.includes("Roupa") ||
+      norm.includes("Cabide") ||
+      norm.includes("Secador") ||
+      norm.includes("Inteligente")
+    ) {
+      return "https://www.cstoreao.shop/produto/Secador-Inteligente";
+    }
+
+    if (lead?.pageUrl || lead?.productUrl || lead?.url) {
+      const explicitUrl = lead.pageUrl || lead.productUrl || lead.url;
+      if (typeof explicitUrl === "string" && explicitUrl.startsWith("http")) {
+        return explicitUrl;
+      }
+    }
+
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://www.cstoreao.shop";
+    const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
+    const baseUrl = `${origin}${pathname}`;
+
+    let param = "secador-uv";
+    if (norm.includes("Cinta")) param = "cinta-colombiana";
+    else if (norm.includes("Camisa")) param = "camisa-seda";
+    else if (norm.includes("Base")) param = "base-movel";
+    else if (norm.includes("Roteador")) param = "roteador-5g";
+
+    return `${baseUrl}?product=${param}`;
+  };
+
+  const getWhatsAppReservationText = (lead: any) => {
+    const name = lead?.name || "Cliente";
+    const product = normalizeProductName(lead?.produto || lead?.product || lead?.produtoName || lead?.rawProduto);
+    const totalFormatted = new Intl.NumberFormat("pt-AO", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(getLeadPrice(lead));
+
+    const address = [lead?.province || "Luanda", lead?.area || lead?.address]
+      .filter(Boolean)
+      .join(", ");
+
+    const cleanObs = getCleanObservacoes(lead);
+    const obsLine = cleanObs ? `Opções / Especificações: ${cleanObs}\n` : "";
+    const pageUrl = getProductPageUrl(lead);
+
+    return `Olá Sr/a ${name}!
+Recebemos a sua reserva e queremos confirmar todos os detalhes antes de processar o seu pedido:
+
+Produto: ${product}
+${obsLine}Endereço de Entrega: ${address}
+Valor Total: ${totalFormatted} Kz
+
+Link da Página da Reserva:
+${pageUrl}
+
+Por favor, responda a esta mensagem confirmando se todas as informações estão corretas para darmos seguimento à sua reserva. Obrigado!`;
+  };
+
+  const getWhatsAppDeliveryText = (lead: any) => {
+    const name = lead?.name || "Cliente";
+    const date = lead?.timestamp
+      ? new Date(lead.timestamp).toLocaleDateString("pt-AO")
+      : "N/A";
+    const product = normalizeProductName(lead?.produto || lead?.product || lead?.produtoName || lead?.rawProduto);
+    const totalFormatted = new Intl.NumberFormat("pt-AO", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(getLeadPrice(lead));
+
+    const address = [lead?.province || "Luanda", lead?.area || lead?.address]
+      .filter(Boolean)
+      .join(", ");
+
+    const cleanObs = getCleanObservacoes(lead);
+    const productDetail = cleanObs ? `${product} (${cleanObs})` : product;
+    const pageUrl = getProductPageUrl(lead);
+
+    return `Olá Sr/a ${name}!
+Aqui é da C Store Angola!
+
+No dia ${date} realizou a reserva de ${productDetail} no valor de ${totalFormatted} Kz.
+
+Temos uma boa notícia — a sua encomenda já chegou e está pronta para entrega!
+
+Por favor, confirme se os dados de entrega estão corretos:
+Endereço: ${address}
+Produto: ${productDetail}
+Total a pagar: ${totalFormatted} Kz
+
+Link do Produto:
+${pageUrl}
+
+Se estiver tudo correto, qual é o melhor período para receber a entrega?
+- Manhã (8:00 às 12:00)
+- Tarde (12:00 às 16:00)
+- Final do dia (16:00 às 18:00)`;
+  };
+
+  const formatWhatsAppPhone = (phoneRaw: string): string => {
+    let clean = (phoneRaw || "").replace(/\D/g, "");
+    if (clean.length === 9 && (clean.startsWith("9") || clean.startsWith("2"))) {
+      clean = `244${clean}`;
+    }
+    return clean;
+  };
+
+  const sendOrderToWhatsApp = (leadData?: any) => {
+    const data = leadData || {
+      name: lastSubmittedLead?.name || formData.name,
+      phone: lastSubmittedLead?.phone || formData.phone,
+      area: lastSubmittedLead?.area || formData.area,
+      province: lastSubmittedLead?.province || (formData.province === "Outra" ? formData.customProvince : formData.province),
+      quantity: lastSubmittedLead?.quantity || formData.quantity || 1,
+      deliveryDate: lastSubmittedLead?.deliveryDate || formData.deliveryDate,
+      deliveryPeriod: lastSubmittedLead?.deliveryPeriod || formData.deliveryPeriod || "Manhã (08:00 às 12:00)",
+      totalPrice: lastSubmittedLead?.totalPrice || ((lastSubmittedLead?.quantity || formData.quantity || 1) * 35000),
+      productName: lastSubmittedLead?.productName || "Secador Expresso Pro",
+    };
+
+    const targetRaw = appSettings.whatsappOrderPhone || "921167980";
+    const targetPhone = formatWhatsAppPhone(targetRaw);
+
+    let formattedDate = data.deliveryDate || "A combinar";
+    if (formattedDate && formattedDate.includes("-")) {
+      const parts = formattedDate.split("-");
+      if (parts.length === 3) {
+        formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+
+    const totalFormatted = new Intl.NumberFormat("pt-AO", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(data.totalPrice || (data.quantity || 1) * 35000);
+
+    const addressFull = [data.area, data.province].filter(Boolean).join(", ") || "Luanda";
+
+    const message = `Olá C Store Angola!
+Acabei de efetuar o pedido do *Secador Expresso Pro*.
+
+*DADOS DO PEDIDO:*
+*Nome:* ${data.name || "Cliente"}
+*WhatsApp / Contacto:* ${data.phone || "Não informado"}
+*Endereço / Província:* ${addressFull}
+*Produto:* Secador Expresso Pro (${data.quantity || 1}x Unidade${(data.quantity || 1) > 1 ? "s" : ""})
+*Total a Pagar:* ${totalFormatted} Kz (na entrega)
+*Data Prevista de Entrega:* ${formattedDate}
+*Período de Entrega:* ${data.deliveryPeriod || "Manhã (08:00 às 12:00)"}
+
+Por favor, confirmem o envio do meu pedido. Obrigado!`;
+
+    const encoded = encodeURIComponent(message);
+    window.open(`https://api.whatsapp.com/send?phone=${targetPhone}&text=${encoded}`, "_blank");
+  };
+
+  const handleCopyLead = (lead: any) => {
+    const text = getFormattedLeadText(lead);
+    navigator.clipboard.writeText(text);
+    alert("Informações copiadas!");
+  };
+
+  const handleWhatsAppReservation = (lead: any) => {
+    if (!lead?.phone) return;
+    const cleanPhone = formatWhatsAppPhone(lead.phone);
+    const text = getWhatsAppReservationText(lead);
+    setWhatsAppModalData({
+      isOpen: true,
+      lead,
+      title: "Confirmar Reserva",
+      type: "reserva",
+      messageText: text,
+      recipientPhone: cleanPhone,
+      recipientName: lead.name || "Cliente",
+    });
+  };
+
+  const getWhatsAppStockOrderText = (lead: any) => {
+    const name = lead?.name || "Cliente";
+    const product = normalizeProductName(lead?.produto || lead?.product || lead?.produtoName || lead?.rawProduto);
+    const totalFormatted = new Intl.NumberFormat("pt-AO", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(getLeadPrice(lead));
+
+    const address = [lead?.province || "Luanda", lead?.area || lead?.address]
+      .filter(Boolean)
+      .join(", ");
+
+    let formattedDate = lead?.deliveryDate || "A agendar";
+    if (formattedDate && formattedDate.includes("-")) {
+      const parts = formattedDate.split("-");
+      if (parts.length === 3) {
+        formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+    const period = lead?.deliveryPeriod || "Manhã (08:00 às 12:00)";
+    const qty = Number(lead?.quantity) || Number(lead?.qtd) || 1;
+
+    return `Olá Sr/a ${name}!
+Aqui é da C Store Angola!
+
+Recebemos o seu pedido de *${product}* (${qty}x Unidade${qty > 1 ? "s" : ""}) com *entrega imediata*!
+
+*RESUMO DO SEU PEDIDO:*
+*Endereço:* ${address}
+*Data Prevista de Entrega:* ${formattedDate}
+*Período de Entrega:* ${period}
+*Total a Pagar:* ${totalFormatted} Kz (pagamento no ato da entrega)
+
+Por favor, responda a esta mensagem com *"CONFIRMADO"* para que o nosso estafeta dê seguimento ao envio da sua encomenda. Obrigado!`;
+  };
+
+  const handleWhatsAppStockOrder = (lead: any) => {
+    if (!lead?.phone) return;
+    const cleanPhone = formatWhatsAppPhone(lead.phone);
+    const text = getWhatsAppStockOrderText(lead);
+    setWhatsAppModalData({
+      isOpen: true,
+      lead,
+      title: "Confirmar Encomenda em Stock",
+      type: "stock",
+      messageText: text,
+      recipientPhone: cleanPhone,
+      recipientName: lead.name || "Cliente",
+    });
+  };
+
+  const handleWhatsAppDelivery = (lead: any) => {
+    if (!lead?.phone) return;
+    const cleanPhone = formatWhatsAppPhone(lead.phone);
+    const text = getWhatsAppDeliveryText(lead);
+    setWhatsAppModalData({
+      isOpen: true,
+      lead,
+      title: "Confirmar Entrega",
+      type: "entrega",
+      messageText: text,
+      recipientPhone: cleanPhone,
+      recipientName: lead.name || "Cliente",
+    });
+  };
+
+  const getWhatsAppPendingText = (lead: any) => {
+    const name = lead?.name || "Cliente";
+    const product = normalizeProductName(lead?.produto || lead?.product || lead?.produtoName || lead?.rawProduto);
+    const totalFormatted = new Intl.NumberFormat("pt-AO", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(getLeadPrice(lead));
+
+    const address = [lead?.province || "Luanda", lead?.area || lead?.address]
+      .filter(Boolean)
+      .join(", ");
+
+    const cleanObs = getCleanObservacoes(lead);
+    const obsLine = cleanObs ? `Especificações: ${cleanObs}\n` : "";
+    const pageUrl = getProductPageUrl(lead);
+
+    return `Olá Sr/a ${name}!
+Aqui é da C Store Angola!
+
+Notamos que iniciou o preenchimento da reserva de ${product}, mas o seu pedido ficou pendente e não foi concluído.
+
+Gostaria de finalizar a sua reserva conosco?
+
+Resumo das opções selecionadas:
+Produto: ${product}
+${obsLine}Endereço: ${address || "A informar"}
+Valor Total: ${totalFormatted} Kz
+
+Pode rever as informações e concluir a sua reserva diretamente neste link:
+${pageUrl}
+
+Se tiver alguma dúvida ou precisar de apoio para finalizar, responda a esta mensagem. Estamos à disposição!`;
+  };
+
+  const handleWhatsAppPending = (lead: any) => {
+    if (!lead?.phone) return;
+    const cleanPhone = formatWhatsAppPhone(lead.phone);
+    const text = getWhatsAppPendingText(lead);
+    setWhatsAppModalData({
+      isOpen: true,
+      lead,
+      title: "Recuperar Lead Pendente",
+      type: "pendente",
+      messageText: text,
+      recipientPhone: cleanPhone,
+      recipientName: lead.name || "Cliente",
+    });
+  };
+
+  const updateLeadStatus = async (leadId: string, newStatus: string) => {
+    // Update no UI otimista
+    setAdminData((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l)),
+    );
+    setSelectedDrawerLead((prev: any) =>
+      prev && prev.id === leadId ? { ...prev, status: newStatus } : prev,
+    );
+
+    try {
+      await updateDoc(doc(db, "leads", leadId), { status: newStatus });
+      const targetLead = adminData.find((l) => l.id === leadId);
+      if (targetLead) {
+        if (newStatus === "Reservado" || newStatus === "Qualificado") {
+          sendMetaConversionEvent({
+            eventName: "CompleteRegistration",
+            lead: {
+              name: targetLead.name,
+              phone: targetLead.phone,
+              province: targetLead.province,
+              produto: targetLead.produto,
+            },
+            customData: {
+              crm_status: "lead_qualificado",
+            },
+          });
+        } else if (newStatus === "Transferido" || newStatus === "Em Vendas") {
+          sendMetaConversionEvent({
+            eventName: "InitiateCheckout",
+            lead: {
+              name: targetLead.name,
+              phone: targetLead.phone,
+              province: targetLead.province,
+              produto: targetLead.produto,
+            },
+            customData: {
+              crm_status: "transferido_para_vendas",
+            },
+          });
+        } else if (newStatus === "Vendido") {
+          const leadPrice = getLeadPrice(targetLead);
+          sendMetaConversionEvent({
+            eventName: "Purchase",
+            lead: {
+              name: targetLead.name,
+              phone: targetLead.phone,
+              province: targetLead.province,
+              produto: targetLead.produto,
+              price: leadPrice,
+            },
+            customData: {
+              crm_status: "vendido",
+              value: leadPrice,
+              currency: "USD",
+            },
+          });
+        }
+      }
+    } catch (err: any) {
+      if (
+        err instanceof Error &&
+        err.message.includes("missing or insufficient permissions")
+      ) {
+        handleFirestoreError(err, OperationType.UPDATE, `leads/${leadId}`);
+      }
+      console.error("Erro ao atualizar status:", err);
+      // Carregar os dados reais em caso de erro no servidor
+      loadAdminData();
+    }
+  };
+
+  const handleImportProspectLeads = async (prospects: ProspectLead[]) => {
+    for (const p of prospects) {
+      const newLeadData = {
+        name: p.name,
+        phone: p.phone,
+        province: p.province || "Luanda",
+        area: p.area || "",
+        address: p.area || "",
+        produto: p.businessType || "Prospecção IA",
+        status: "Pendente",
+        timestamp: new Date().toISOString(),
+        observacoes: `[Decisor: ${p.contactPerson || "N/A"}] - ${p.notes}`,
+        crmNotes: [
+          `[${new Date().toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit" })}] Importado via Prospecção IA (Nicho: ${p.businessType})`,
+          `Abordagem sugerida: "${p.suggestedPitch}"`,
+        ],
+        source: "prospeccao_ia",
+        leadScore: p.score,
+        quantity: 1,
+      };
+
+      try {
+        await addDoc(collection(db, "leads"), newLeadData);
+      } catch (err) {
+        console.error("Erro ao importar lead para Firestore:", err);
+      }
+    }
+  };
+
+  const toggleLeadDoubleCheck = async (leadId: string, currentValOrLevel?: any) => {
+    let currentLevel = 0;
+    if (typeof currentValOrLevel === "number") {
+      currentLevel = currentValOrLevel;
+    } else if (typeof currentValOrLevel === "boolean") {
+      currentLevel = currentValOrLevel ? 2 : 0;
+    } else {
+      const found = adminData.find((l) => l.id === leadId);
+      if (found) {
+        if (typeof found.verificationLevel === "number") {
+          currentLevel = found.verificationLevel;
+        } else if (found.doubleCheck || found.verified2x) {
+          currentLevel = 2;
+        } else if (found.verified1x) {
+          currentLevel = 1;
+        }
+      }
+    }
+
+    // 3-step engineering: 0 (desmarcado) -> 1 (1x: 1 'v') -> 2 (2x: 2 'v's) -> 0 (desmarcado)
+    const nextLevel = (currentLevel + 1) % 3;
+    const is2x = nextLevel === 2;
+    const is1x = nextLevel >= 1;
+
+    // Save to localStorage for instant client persistence across reloads/offline
+    try {
+      const cache = JSON.parse(localStorage.getItem("verified_leads_cache") || "{}");
+      cache[leadId] = nextLevel;
+      localStorage.setItem("verified_leads_cache", JSON.stringify(cache));
+    } catch (e) {
+      console.error("Erro no cache de verificação local", e);
+    }
+
+    setAdminData((prev) =>
+      prev.map((l) =>
+        l.id === leadId
+          ? {
+              ...l,
+              verificationLevel: nextLevel,
+              doubleCheck: is2x,
+              verified2x: is2x,
+              verified1x: is1x,
+            }
+          : l,
+      ),
+    );
+    if (selectedLeadForPreview && selectedLeadForPreview.id === leadId) {
+      setSelectedLeadForPreview((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              verificationLevel: nextLevel,
+              doubleCheck: is2x,
+              verified2x: is2x,
+              verified1x: is1x,
+            }
+          : null,
+      );
+    }
+    try {
+      await updateDoc(doc(db, "leads", leadId), {
+        verificationLevel: nextLevel,
+        doubleCheck: is2x,
+        verified2x: is2x,
+        verified1x: is1x,
+      });
+    } catch (err: any) {
+      if (
+        err instanceof Error &&
+        err.message.includes("missing or insufficient permissions")
+      ) {
+        handleFirestoreError(err, OperationType.UPDATE, `leads/${leadId}`);
+      }
+      console.error("Erro ao atualizar verificação:", err);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (filteredData.length === 0) {
+      alert("Não há dados para exportar com os filtros atuais.");
+      return;
+    }
+
+    const headers = [
+      "Data",
+      "Nome",
+      "WhatsApp / Contacto",
+      "Província",
+      "País",
+      "Endereço / Município",
+      "Produto",
+      "Qtd",
+      "Detalhes / Características",
+      "Status / Reserva",
+    ];
+    const csvRows = [headers.join(",")];
+
+    filteredData.forEach((lead) => {
+      const date = lead.timestamp
+        ? new Date(lead.timestamp).toLocaleDateString("pt-AO")
+        : "N/A";
+      const q = lead.quantity || lead.qtd || lead.quantidade || 1;
+      const colorStr = lead.cor ? `Cor: ${lead.cor}` : "";
+      const sizeStr = lead.tamanho ? `Tamanho: ${lead.tamanho}` : "";
+      const obsStr = lead.observacoes ? getCleanObservacoes(lead) : "";
+      const detailParts: string[] = [];
+      if (colorStr) detailParts.push(colorStr);
+      if (sizeStr) detailParts.push(sizeStr);
+      if (obsStr && !obsStr.includes(colorStr) && !obsStr.includes(sizeStr)) {
+        detailParts.push(obsStr);
+      }
+      const details = detailParts.length > 0 ? detailParts.join(" | ") : `${q} Un.`;
+
+      const province = lead.province || "Luanda";
+      const country = lead.country || lead.pais || "Angola";
+      const address = lead.area || lead.address || "N/A";
+
+      const row = [
+        `"${date}"`,
+        `"${lead.name || ""}"`,
+        `"${lead.phone || ""}"`,
+        `"${province.replace(/"/g, '""')}"`,
+        `"${country.replace(/"/g, '""')}"`,
+        `"${address.replace(/"/g, '""')}"`,
+        `"${formatPageNameWithCensorship(lead.produto || "Secador Inteligente UV")}"`,
+        q,
+        `"${details.replace(/"/g, '""')}"`,
+        `"${lead.status || ""}"`,
+      ];
+      csvRows.push(row.join(","));
+    });
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," + "\uFEFF" + csvRows.join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `Leads_Valida_C_${new Date().toISOString().split("T")[0]}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const handleExportPDF = () => {
+    if (filteredData.length === 0) {
+      alert("Não há dados para exportar com os filtros atuais.");
+      return;
+    }
+
+    try {
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+
+      // Banner Superior
+      doc.setFillColor(30, 41, 59);
+      doc.rect(0, 0, 297, 26, "F");
+
+      // Badge Grupo Cassaminha
+      doc.setFillColor(79, 70, 229);
+      doc.roundedRect(12, 4, 42, 5.5, 1, 1, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.text("GRUPO CASSAMINHA", 14, 7.8);
+
+      // Título do Relatório
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("Relatório de Encomendas & Leads — Grupo Cassaminha", 12, 19);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(203, 213, 225);
+      doc.text(
+        `Gerado em: ${new Date().toLocaleString("pt-AO")} | Total: ${filteredData.length} registo(s)`,
+        180,
+        19,
+      );
+
+      const tableHeaders = [
+        [
+          "Data",
+          "Nome",
+          "WhatsApp",
+          "Província / País",
+          "Endereço",
+          "Produto",
+          "Detalhes",
+          "Qtd",
+          "Status / Reserva",
+        ],
+      ];
+
+      const tableRows = filteredData.map((lead) => {
+        const date = lead.timestamp
+          ? new Date(lead.timestamp).toLocaleDateString("pt-AO")
+          : "N/A";
+        const name = lead.name || "N/A";
+        const phone = lead.phone || "N/A";
+        const province = lead.province || "Luanda";
+        const country = lead.country || lead.pais || "Angola";
+        const provCountry = `${province}\n(${country})`;
+        const address = lead.area || lead.address || "N/A";
+
+        const product = formatPageNameWithCensorship(
+          lead.produto || "Secador Inteligente UV",
+        );
+
+        const qty = lead.quantity || lead.qtd || lead.quantidade || 1;
+        const colorStr = lead.cor ? `Cor: ${lead.cor}` : "";
+        const sizeStr = lead.tamanho ? `Tamanho: ${lead.tamanho}` : "";
+        const obsStr = lead.observacoes ? getCleanObservacoes(lead) : "";
+
+        const detailParts: string[] = [];
+        if (colorStr) detailParts.push(colorStr);
+        if (sizeStr) detailParts.push(sizeStr);
+        if (obsStr && !obsStr.includes(colorStr) && !obsStr.includes(sizeStr)) {
+          detailParts.push(obsStr);
+        }
+        const details =
+          detailParts.length > 0 ? detailParts.join(" | ") : `${qty} Unidade(s)`;
+
+        let statusStr = lead.status || "Pendente";
+        if (lead.status && lead.status.includes("Reservado")) {
+          statusStr = "✅ Reservado";
+        } else if (lead.status === "Pendente") {
+          statusStr = "⏳ Pendente (Não Reservado)";
+        } else if (lead.status === "Entregue" || lead.status === "Pago") {
+          statusStr = "📦 Entregue";
+        } else if (lead.status === "Rejeitado") {
+          statusStr = "❌ Rejeitado";
+        } else if (lead.status === "Cancelado") {
+          statusStr = "🚫 Cancelado";
+        }
+
+        return [date, name, phone, provCountry, address, product, details, `${qty}`, statusStr];
+      });
+
+      autoTable(doc, {
+        head: tableHeaders,
+        body: tableRows,
+        startY: 30,
+        margin: { left: 12, right: 12 },
+        theme: "striped",
+        styles: {
+          fontSize: 6.5,
+          cellPadding: 1.8,
+          valign: "middle",
+          overflow: "linebreak",
+          textColor: [30, 41, 59],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [79, 70, 229],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 7,
+          halign: "center",
+          cellPadding: 2.2,
+        },
+        columnStyles: {
+          0: { cellWidth: 18, halign: "center" },
+          1: { cellWidth: 30, halign: "left" },
+          2: { cellWidth: 26, halign: "center" },
+          3: { cellWidth: 26, halign: "center" },
+          4: { cellWidth: 38, halign: "left" },
+          5: { cellWidth: 32, halign: "left" },
+          6: { cellWidth: 57, halign: "left" },
+          7: { cellWidth: 11, halign: "center" },
+          8: { cellWidth: 35, halign: "center" },
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        didDrawPage: (data) => {
+          // Rodapé em todas as páginas
+          const pageSize = doc.internal.pageSize;
+          const pageHeight = pageSize.height || pageSize.getHeight();
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(100, 116, 139);
+          doc.text(
+            "Documento Oficial de Relatório — Grupo Cassaminha",
+            12,
+            pageHeight - 7,
+          );
+          doc.text(
+            `Página ${data.pageNumber}`,
+            285,
+            pageHeight - 7,
+            { align: "right" },
+          );
+        },
+      });
+
+      // Bloco de Assinatura e Autenticação do Grupo Cassaminha no final da tabela
+      const finalY = (doc as any).lastAutoTable?.finalY || 160;
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      // Se não houver espaço suficiente no fim da página para o bloco de assinatura, adiciona nova página
+      const requiredSpace = 30;
+      let sigY = finalY + 7;
+      if (sigY + requiredSpace > pageHeight - 15) {
+        doc.addPage();
+        sigY = 20;
+      }
+
+      // Caixa de Assinatura Oficial
+      doc.setDrawColor(203, 213, 225);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(12, sigY, 273, 24, 3, 3, "FD");
+
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text("EMPRESA RESPONSÁVEL:", 16, sigY + 6.5);
+      doc.setFont("helvetica", "normal");
+      doc.text("Grupo Cassaminha", 58, sigY + 6.5);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("SISTEMA & PLATAFORMA:", 16, sigY + 12);
+      doc.setFont("helvetica", "normal");
+      doc.text("Valida C (Gestão Unificada de Encomendas)", 58, sigY + 12);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("ASSINATURA / AUTENTICAÇÃO:", 16, sigY + 17.5);
+
+      // Linha de Assinatura
+      doc.setLineWidth(0.4);
+      doc.setDrawColor(79, 70, 229);
+      doc.line(58, sigY + 17.5, 160, sigY + 17.5);
+
+      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(79, 70, 229);
+      doc.text("Assinatura Autorizada — Grupo Cassaminha", 58, sigY + 21);
+
+      doc.save(`Leads_Grupo_Cassaminha_${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (err) {
+      console.error("Erro ao gerar PDF:", err);
+      alert("Ocorreu um erro ao gerar o ficheiro PDF.");
+    }
+  };
+
+  const filteredData = adminData.filter((lead) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.phone.includes(searchTerm) ||
+      lead.address.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      filterStatus === "Todos" ||
+      lead.status === filterStatus ||
+      (lead.status &&
+        lead.status.includes("Reservado") &&
+        filterStatus === "Reservado");
+    let matchesDate = filterDate === "";
+    if (filterDate !== "" && lead.timestamp) {
+      try {
+        matchesDate =
+          new Date(lead.timestamp).toISOString().split("T")[0] === filterDate;
+      } catch (e) {
+        matchesDate = false;
+      }
+    }
+    const matchesProduct =
+      selectedPagesFilter.length > 0
+        ? selectedPagesFilter.includes(lead.produto || "Secador Inteligente UV")
+        : filterProduct === "" ||
+          (lead.produto || "Secador Inteligente UV")
+            .toLowerCase()
+            .includes(filterProduct.toLowerCase());
+
+    // Filtro CRM por período (Hoje, Últimos 7 dias, etc.)
+    let passesTimeRange = true;
+    let leadDateStr = lead.timestamp;
+    try {
+      if (!leadDateStr && lead.createdAt?.toDate) {
+        leadDateStr = lead.createdAt.toDate().toISOString();
+      }
+    } catch (e) {}
+    if (leadDateStr && timeRangeFilter !== "Tudo") {
+      const leadDate = new Date(leadDateStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (timeRangeFilter === "Hoje") {
+        passesTimeRange = leadDate >= today;
+      } else if (timeRangeFilter === "Últimos 7 Dias") {
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        passesTimeRange = leadDate >= sevenDaysAgo;
+      } else if (timeRangeFilter === "Este Mês") {
+        passesTimeRange =
+          leadDate.getMonth() === today.getMonth() &&
+          leadDate.getFullYear() === today.getFullYear();
+      }
+    }
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesDate &&
+      matchesProduct &&
+      passesTimeRange
+    );
+  });
+
+  const allDisplayedLeads = filteredData.filter((lead) => {
+    if (adminListTab === "arquivados") {
+      return lead.status === "Entregue" || lead.status === "Pago";
+    } else {
+      return lead.status !== "Entregue" && lead.status !== "Pago";
+    }
+  });
+
+  const itemsPerPage = 40;
+  const totalPages = Math.ceil(allDisplayedLeads.length / itemsPerPage) || 1;
+  const currentPage = Math.min(adminCurrentPage, totalPages);
+  const displayedLeads = allDisplayedLeads.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
+
+  const leadsForMetrics = adminData.filter((lead) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.phone.includes(searchTerm) ||
+      lead.address.toLowerCase().includes(searchTerm.toLowerCase());
+
+    let matchesDate = filterDate === "";
+    if (filterDate !== "" && lead.timestamp) {
+      try {
+        matchesDate =
+          new Date(lead.timestamp).toISOString().split("T")[0] === filterDate;
+      } catch (e) {
+        matchesDate = false;
+      }
+    }
+    const matchesProduct =
+      selectedPagesFilter.length > 0
+        ? selectedPagesFilter.includes(lead.produto || "Secador Inteligente UV")
+        : filterProduct === "" ||
+          (lead.produto || "Secador Inteligente UV")
+            .toLowerCase()
+            .includes(filterProduct.toLowerCase());
+
+    let passesTimeRange = true;
+    let leadDateStr = lead.timestamp;
+    try {
+      if (!leadDateStr && lead.createdAt?.toDate) {
+        leadDateStr = lead.createdAt.toDate().toISOString();
+      }
+    } catch (e) {}
+    if (leadDateStr && timeRangeFilter !== "Tudo") {
+      const leadDate = new Date(leadDateStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (timeRangeFilter === "Hoje") {
+        passesTimeRange = leadDate >= today;
+      } else if (timeRangeFilter === "Últimos 7 Dias") {
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        passesTimeRange = leadDate >= sevenDaysAgo;
+      } else if (timeRangeFilter === "Este Mês") {
+        passesTimeRange =
+          leadDate.getMonth() === today.getMonth() &&
+          leadDate.getFullYear() === today.getFullYear();
+      }
+    }
+
+    return matchesSearch && matchesDate && matchesProduct && passesTimeRange;
+  });
+
+  const totalSubmissions = leadsForMetrics.length;
+  const totalReservados = leadsForMetrics.filter(
+    (d) => d.status && d.status.includes("Reservado"),
+  ).length;
+  const conversionRate =
+    totalSubmissions > 0
+      ? ((totalReservados / totalSubmissions) * 100).toFixed(1)
+      : "85.0";
+
+  const uniquePages = Array.from(
+    new Set([
+      "Cinta Modeladora Colombiana",
+      "Secador Inteligente UV",
+      "Secador Expresso Pro",
+      "Roteador 5G Ultra Desbloqueado",
+      "Base Móvel 360°",
+      "Camisa Seda Gelada Premium",
+      ...adminData.map((l) => l.produto).filter(Boolean),
+    ]),
+  );
+
+  const formatPageNameWithCensorship = (
+    pageName: string | undefined | null,
+  ) => {
+    if (!pageName) return "";
+    if (!hidePhones) return pageName;
+    const index = uniquePages.indexOf(pageName);
+    if (index !== -1) {
+      return `Página #${index + 1}`;
+    }
+    return "Página Ocultada";
+  };
+
+  const isProtectedView = [
+    "admin",
+    "pages",
+    "danger-zone",
+    "ai-generator",
+    "settings",
+    "prompt-gallery",
+    "users",
+  ].includes(view);
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="animate-spin text-emerald-400 h-10 w-10" />
+          <p className="text-sm font-bold text-slate-400 font-mono">
+            A carregar sessão...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    view === "auth" ||
+    view === "auth-register" ||
+    (isProtectedView && !isAuthenticated && userStatus !== undefined)
+  ) {
+    if (isAuthenticated && userStatus !== undefined) {
+      setView("pages");
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+        </div>
+      );
+    }
+    if (!isAuthenticated) {
+      return (
+        <AuthView
+          setView={setView}
+          onLoginSuccess={() => setView("pages")}
+          initialTab={view === "auth-register" ? "register" : "login"}
+        />
+      );
+    }
+  }
+
+  if (view === "home") {
+    return (
+      <HomeView
+        setView={setView}
+        isAuthenticated={isAuthenticated}
+        currentUser={auth.currentUser}
+        userName={userName}
+      />
+    );
+  }
+
+  if (isProtectedView && isAuthenticated && userStatus === null) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  if (
+    isProtectedView &&
+    isAuthenticated &&
+    (userStatus === "blocked" ||
+      userStatus === "expired" ||
+      userStatus === "pending")
+  ) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-2xl max-w-md w-full text-white">
+          <h1 className="text-2xl font-black text-white mb-2">
+            Acesso Restrito
+          </h1>
+          <p className="text-slate-400 mb-6">
+            A sua conta encontra-se atualmente inativa ou bloqueada. Por favor,
+            contacte o administrador (Grupo Cassaminha) para libertar o seu
+            acesso.
+          </p>
+          <button
+            onClick={() => {
+              setView("auth");
+              auth.signOut();
+            }}
+            className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 w-full"
+          >
+            Sair da conta
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`min-h-screen font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-300 ${
+        isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-800"
+      }`}
+    >
+      {/* Navigation */}
+      {isAuthenticated && view !== "home" && (
+        <nav className={`bg-slate-900 text-white shadow-xl border-b border-slate-800 ${isSalesView ? "hidden md:block relative z-20" : "sticky top-0 z-40"}`}>
+          <div className="w-full max-w-none px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
+            <div
+              className="flex items-center gap-3 cursor-pointer"
+              onClick={() => setView("home")}
+            >
+              {view === "admin" ||
+              view === "pages" ||
+              view === "danger-zone" ||
+              view === "users" ? (
+                <>
+                  <img
+                    src="https://i.postimg.cc/qqtQqXb4/C-grupo.png"
+                    alt="Logotipo C Grupo"
+                    className="h-8 w-auto object-contain rounded"
+                  />
+                  <span className="font-bold text-lg tracking-tight">
+                    Valida C
+                  </span>
+                </>
+              ) : (
+                <>
+                  <img
+                    src="https://i.postimg.cc/3wsKF20v/Chat-GPT-Image-13-de-mai-de-2026-12-40-58.png"
+                    alt="Logotipo C Store Angola"
+                    className="h-10 w-auto object-contain rounded"
+                  />
+                  <span className="font-bold text-lg tracking-tight">
+                    C Store Angola
+                  </span>
+                </>
+              )}
+            </div>
+
+            <div
+              className={`flex items-center gap-4 ${isSalesView ? "hidden md:flex" : ""}`}
+            >
+              {isAuthenticated && (
+                <>
+                  <PWAInstallButton />
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white rounded-full transition-all flex items-center justify-center gap-2 cursor-pointer text-xs font-bold shadow-sm"
+                    title="Actualizar Página"
+                  >
+                    <RefreshCw size={12} className="text-emerald-400" />
+                    <span>Actualizar</span>
+                  </button>
+                  <div className="relative">
+                    <div
+                      className="flex items-center gap-2 border border-slate-700 bg-slate-800/80 rounded-full pl-1.5 pr-4 py-1.5 cursor-pointer hover:bg-slate-700 hover:border-slate-600 transition-all"
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    >
+                      <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-sm shadow-inner">
+                        {(auth.currentUser?.displayName || "Pedro")
+                          .charAt(0)
+                          .toUpperCase()}
+                      </div>
+                      <span className="text-sm font-medium text-emerald-400">
+                        Olá, {auth.currentUser?.displayName || "Pedro"}
+                      </span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-emerald-500 ml-1"
+                      >
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </div>
+
+                    <AnimatePresence>
+                      {isDropdownOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => setIsDropdownOpen(false)}
+                          />
+                          <motion.div
+                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute right-0 mt-2 w-64 bg-slate-800 rounded-2xl shadow-xl border border-slate-700 z-50 overflow-hidden"
+                          >
+                            <div className="p-2 space-y-1">
+                              <button
+                                onClick={() => {
+                                  setIsDropdownOpen(false);
+                                  openProfileModal();
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors text-left"
+                              >
+                                <User size={16} /> Meu Perfil
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setTheme(isDark ? "light" : "dark")
+                                }
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors text-left"
+                              >
+                                {isDark ? (
+                                  <>
+                                    <Sun size={16} className="text-amber-400" />
+                                    <span>Tema Claro</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Moon
+                                      size={16}
+                                      className="text-indigo-400"
+                                    />
+                                    <span>Tema Escuro</span>
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsDropdownOpen(false);
+                                  setView("admin");
+                                  setAdminSubView("leads");
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors text-left"
+                              >
+                                <FileText size={16} /> Validação de Leads
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsDropdownOpen(false);
+                                  setView("admin");
+                                  setAdminSubView("prospeccao");
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-purple-300 hover:text-white hover:bg-purple-900/40 rounded-xl transition-colors text-left"
+                              >
+                                <Sparkles size={16} className="text-amber-300" /> Prospecção com IA
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsDropdownOpen(false);
+                                  setView("admin");
+                                  setAdminSubView("meta");
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-blue-300 hover:text-white hover:bg-blue-900/40 rounded-xl transition-colors text-left"
+                              >
+                                <Share2 size={16} className="text-blue-400" /> Conexão Meta (Oficial)
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsDropdownOpen(false);
+                                  setView("admin");
+                                  setAdminSubView("calculadora");
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-amber-400 hover:text-amber-300 hover:bg-slate-700/80 rounded-xl transition-colors text-left"
+                              >
+                                <Calculator size={16} className="text-amber-400" /> Calculadora de Saldos
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsDropdownOpen(false);
+                                  setView("pages");
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors text-left"
+                              >
+                                <LayoutDashboard size={16} /> Gerenc. Páginas
+                              </button>
+                              {(auth.currentUser?.email ===
+                                "exportacoes.extras@gmail.com" ||
+                                auth.currentUser?.email?.toLowerCase() ===
+                                  "grupocassaminha@gmail.com") && (
+                                <button
+                                  onClick={() => {
+                                    setIsDropdownOpen(false);
+                                    setView("users");
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors text-left"
+                                >
+                                  <User size={16} /> Gestão de Utilizadores
+                                </button>
+                              )}
+                            </div>
+                            <div className="p-2 border-t border-slate-700">
+                              <button
+                                onClick={async () => {
+                                  await signOut(auth);
+                                  setIsDropdownOpen(false);
+                                  setIsAuthenticated(false);
+                                  setView("home");
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-xl transition-colors text-left font-medium"
+                              >
+                                <LogOut size={16} /> Sair
+                              </button>
+                            </div>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </>
+              )}
+              {!isAuthenticated && view !== "home" && (
+                <button
+                  onClick={() => setView("admin")}
+                  className="text-sm font-medium flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition shadow-sm"
+                >
+                  <Lock size={14} /> Entrar
+                </button>
+              )}
+            </div>
+          </div>
+        </nav>
+      )}
+
+      {/* SALES VIEW */}
+      {view === "sales" && (
+        <main className="pb-24 text-center">
+          {/* BLOCO 1 — HERO */}
+          <section className="pt-10 pb-6 px-4 max-w-4xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8"
+            >
+              <div className="inline-block bg-indigo-100 text-indigo-800 font-bold px-4 py-1.5 rounded-full text-xs sm:text-sm mb-6 border border-indigo-200 uppercase tracking-wider">
+                A solução para quem vive em apartamento em Luanda
+              </div>
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-slate-900 leading-[1.1] mb-8 tracking-tight px-2">
+                O fim definitivo do chulé e da humidade no seu calçado favorito.
+              </h1>
+
+              {/* Product Gallery */}
+              <div className="bg-white p-3 rounded-[2rem] shadow-2xl border border-slate-200 inline-block w-full mb-12">
+                <div className="relative aspect-square sm:aspect-video rounded-2xl overflow-hidden bg-slate-100 w-full mb-4 group shadow-inner">
+                  <AnimatePresence mode="wait">
+                    <motion.img
+                      key={activeImage}
+                      src={IMAGES[activeImage]}
+                      initial={{ opacity: 0, scale: 1.1 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 1.05 }}
+                      transition={{ duration: 0.6 }}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </AnimatePresence>
+                </div>
+                {/* Thumbnails arranged better for mobile */}
+                <div className="flex gap-3 overflow-x-auto pb-4 pt-2 px-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {IMAGES.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveImage(i)}
+                      className={`shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden snap-center transition-all ${
+                        activeImage === i
+                          ? "ring-4 ring-indigo-500 opacity-100 scale-105"
+                          : "ring-1 ring-slate-200 opacity-60 hover:opacity-100 hover:scale-105"
+                      }`}
+                    >
+                      <img
+                        src={img}
+                        alt={`Thumbnail ${i}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto font-medium leading-relaxed">
+                A tecnologia avançada que seca em profundidade e elimina 99.9%
+                das bactérias e fungos enquanto você descansa.
+              </p>
+
+              <div className="max-w-xl mx-auto mb-16 text-left">
+                <h3 className="font-bold text-slate-400 uppercase tracking-widest text-[10px] mb-6 text-center">
+                  Sente que isto acontece consigo?
+                </h3>
+                <div className="grid grid-cols-1 gap-3">
+                  {[
+                    "Praticas desporto e o teu calçado fica sempre encharcado de suor",
+                    "Tens calçado caro que queres preservar por muito mais tempo",
+                    "Sofres com o mau cheiro (chulé) persistente e nada resolve",
+                    "Queres garantir que os teus pés estão livres de fungos e micoses",
+                    "Precisas de secar sapatos de forma rápida nos dias de chuva ?",
+                  ].map((text, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-100"
+                    >
+                      <div className="bg-indigo-50 text-indigo-500 rounded-full p-1">
+                        <CheckCircle size={18} />
+                      </div>
+                      <span className="text-slate-700 font-semibold text-[15px] leading-snug">
+                        {text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* BLOCO 4: BENEFÍCIOS REAIS */}
+              <div className="mb-24 py-12 bg-slate-50 -mx-4 px-6 rounded-[3rem] border border-slate-200">
+                <div className="max-w-4xl mx-auto">
+                  <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">
+                    Benefícios Reais
+                  </h2>
+                  <p className="text-slate-500 mb-10 font-medium">
+                    Muito mais do que apenas secar o calçado.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+                    {[
+                      {
+                        icon: <ShieldAlert size={24} />,
+                        title: "Higiene e Saúde",
+                        desc: "A luz ultravioleta mata fungos e bactérias onde os sprays não chegam.",
+                      },
+                      {
+                        icon: <Activity size={24} />,
+                        title: "Secagem Segura",
+                        desc: "Mantém a temperatura constante (48ºC) para não danificar o seu calçado.",
+                      },
+                      {
+                        icon: <Timer size={24} />,
+                        title: "Tecnologia Inteligente",
+                        desc: "Temporizador automático de até 120min para uma secagem prática e segura.",
+                      },
+                    ].map((item, i) => (
+                      <div
+                        key={i}
+                        className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col hover:-translate-y-1 transition-transform"
+                      >
+                        <div className="text-indigo-600 mb-6 bg-indigo-50 w-12 h-12 rounded-xl flex items-center justify-center">
+                          {item.icon}
+                        </div>
+                        <h4 className="font-bold text-slate-900 mb-3 text-lg leading-tight">
+                          {item.title}
+                        </h4>
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                          {item.desc}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </section>
+
+          <div className="max-w-4xl mx-auto px-4">
+            {/* BLOCO 5: ESTERILIZAÇÃO EM 3 PASSOS */}
+            <section className="mb-24">
+              <h2 className="text-3xl font-black text-slate-900 mb-12 text-center tracking-tight">
+                Esterilização em 3 passos
+              </h2>
+              <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                <div className="relative p-8 bg-white rounded-3xl border border-slate-100 shadow-xl flex flex-col items-center text-center group hover:border-indigo-100 transition-colors">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold absolute -top-6 shadow-lg">
+                    1
+                  </div>
+                  <div className="text-4xl mb-6 mt-2">👟</div>
+                  <p className="font-bold text-slate-800 leading-relaxed">
+                    Insira os bicos do secador dentro do calçado, seja
+                    atacadores ou sapato social
+                  </p>
+                </div>
+                <div className="relative p-8 bg-white rounded-3xl border border-slate-100 shadow-xl flex flex-col items-center text-center group hover:border-indigo-100 transition-colors">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold absolute -top-6 shadow-lg">
+                    2
+                  </div>
+                  <div className="text-4xl mb-6 mt-2">🕒</div>
+                  <p className="font-bold text-slate-800 leading-relaxed">
+                    Escolha o tempo necessário (30 a 120 min) e ative a luz UV
+                    para esterilizar
+                  </p>
+                </div>
+                <div className="relative p-8 bg-white rounded-3xl border border-slate-100 shadow-xl flex flex-col items-center text-center group hover:border-indigo-100 transition-colors">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold absolute -top-6 shadow-lg">
+                    3
+                  </div>
+                  <div className="text-4xl mb-6 mt-2">✨</div>
+                  <p className="font-bold text-slate-800 leading-relaxed">
+                    Retire o seu calçado totalmente seco, cheiroso e livre de
+                    99.9% das bactérias
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* BLOCO 6: TABELA COMPARATIVA */}
+            <section className="mb-24 px-4 overflow-hidden">
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-10 tracking-tight">
+                Secagem Manual VS Secador C Store UV
+              </h2>
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden max-w-2xl mx-auto">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[350px]">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="p-4 border-b border-slate-100 font-bold text-slate-400 uppercase text-[10px] tracking-widest text-center">
+                          Critério
+                        </th>
+                        <th className="p-4 border-b border-slate-100 font-bold text-slate-700 bg-slate-100/50 text-center">
+                          Secagem ao Sol
+                        </th>
+                        <th className="p-4 border-b border-slate-100 font-bold text-indigo-600 bg-indigo-50 text-center uppercase tracking-tighter">
+                          Secador C Store UV
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-[13px] sm:text-sm">
+                      {[
+                        {
+                          c: "⭐ Eliminação Bacteriana",
+                          t: "Limitada",
+                          s: "99.9% (via UV)",
+                          highlight: true,
+                        },
+                        {
+                          c: "Preservação do Couro",
+                          t: "Dura e resseca",
+                          s: "Suave (48ºC fixos)",
+                        },
+                        {
+                          c: "⭐ Tempo de Secagem",
+                          t: "24h a 48h",
+                          s: "30 a 120 min",
+                          highlight: true,
+                        },
+                        {
+                          c: "Eliminação de Odores",
+                          t: "Superficial",
+                          s: "Profunda (mata a raiz)",
+                        },
+                      ].map((row, i) => (
+                        <tr
+                          key={i}
+                          className={`hover:bg-slate-50 transition-colors ${row.highlight ? "bg-indigo-50/30" : ""}`}
+                        >
+                          <td
+                            className={`p-4 border-b border-slate-50 font-bold text-slate-800 ${row.highlight ? "bg-indigo-100/30" : ""}`}
+                          >
+                            {row.c}
+                          </td>
+                          <td className="p-4 border-b border-slate-50 text-slate-500 text-center">
+                            {row.t}
+                          </td>
+                          <td
+                            className={`p-4 border-b border-slate-50 font-black text-center ${row.highlight ? "text-indigo-700" : "text-slate-900"}`}
+                          >
+                            {row.s}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            {/* BLOCO 7: ESPECIFICAÇÕES TÉCNICAS */}
+            <section className="mb-24 text-left max-w-3xl mx-auto">
+              <h2 className="text-2xl font-bold text-slate-800 mb-8 text-center">
+                Especificações Técnicas
+              </h2>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="divide-y divide-slate-100 font-bold">
+                  <div className="p-5 grid grid-cols-2 gap-4 hover:bg-slate-50 transition-colors">
+                    <span className="text-slate-600">Aquecimento</span>
+                    <span className="text-slate-900 text-right">
+                      48ºC constantes
+                    </span>
+                  </div>
+                  <div className="p-5 grid grid-cols-2 gap-4 hover:bg-slate-50 transition-colors">
+                    <span className="text-slate-600">Tecnologia</span>
+                    <span className="text-slate-900 text-right">
+                      Luz UV Esterilizante
+                    </span>
+                  </div>
+                  <div className="p-5 grid grid-cols-2 gap-4 hover:bg-slate-50 transition-colors">
+                    <span className="text-slate-600">Material</span>
+                    <span className="text-slate-900 text-right">
+                      ABS de alta resistência
+                    </span>
+                  </div>
+                  <div className="p-5 grid grid-cols-2 gap-4 hover:bg-slate-50 transition-colors">
+                    <span className="text-slate-600">Voltagem</span>
+                    <span className="text-slate-900 text-right">
+                      Bivolt Automático
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Checkout Section - UV */}
+            <div
+              id="comprar"
+              className="pt-8 scroll-mt-20 px-4 mb-20 w-full max-w-6xl mx-auto"
+            >
+              <section className="bg-white rounded-[3.5rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col lg:flex-row text-left">
+                <div className="lg:w-[42%] bg-indigo-600 p-10 text-white flex flex-col relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-[100px] -mr-32 -mt-32" />
+                  <div className="relative z-10 mb-auto">
+                    <h2 className="text-3xl sm:text-5xl font-black mb-8 leading-tight tracking-tight">
+                      Pés secos.
+                      <br />
+                      Calçado higienizado.
+                    </h2>
+                    <div className="space-y-4 mb-12">
+                      {[
+                        "Entrega Grátis em Luanda",
+                        "Entrega noutra província Sob-Consulta",
+                        "Pagas no Momento da Entrega",
+                        "Garantia Blindada C Store",
+                        "Suporte via WhatsApp 24/7",
+                      ].map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-4 text-[15px] font-bold bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10"
+                        >
+                          <div className="bg-white text-indigo-600 p-1 rounded-full">
+                            <CheckCircle size={16} />
+                          </div>
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="lg:w-[58%] p-8 sm:p-12">
+                  <div className="text-center sm:text-left mb-10 relative flex flex-col items-center sm:items-start">
+                    <div className="bg-red-500 text-white font-black py-2 px-5 rounded-full text-xs shadow-xl animate-bounce mb-6">
+                      POUPA{" "}
+                      {new Intl.NumberFormat("pt-AO").format(
+                        formData.quantity * 10000,
+                      )}{" "}
+                      KZ HOJE
+                    </div>
+                    <div className="space-y-1 text-center sm:text-left">
+                      <p className="text-slate-400 line-through text-2xl font-bold tracking-tight">
+                        {new Intl.NumberFormat("pt-AO").format(
+                          formData.quantity * 35000,
+                        )}{" "}
+                        Kz
+                      </p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-7xl font-black text-slate-900 tracking-tighter">
+                          {new Intl.NumberFormat("pt-AO").format(
+                            formData.quantity * 25000,
+                          )}
+                        </span>
+                        <span className="text-2xl font-black text-slate-400">
+                          Kz
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleFormSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                          Nome Completo
+                        </label>
+                        <input
+                          id="name-input"
+                          ref={nameInputRef}
+                          type="text"
+                          required
+                          value={formData.name}
+                          onChange={(e) =>
+                            setFormData({ ...formData, name: e.target.value })
+                          }
+                          className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300 font-bold"
+                          placeholder="Ex: Carlos Mendes"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                          Número de WhatsApp
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          value={formData.phone}
+                          onChange={(e) =>
+                            setFormData({ ...formData, phone: e.target.value })
+                          }
+                          className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300 font-bold"
+                          placeholder="Ex: 921 167 980"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                          Província
+                        </label>
+                        <div className="relative">
+                          <select
+                            value={formData.province}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                province: e.target.value,
+                              })
+                            }
+                            className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all appearance-none font-bold text-slate-700"
+                          >
+                            <option value="Luanda">Luanda</option>
+                            <option value="Huambo">Huambo</option>
+                            <option value="Benguela">Benguela</option>
+                            <option value="Outra">Outra</option>
+                          </select>
+                          <ChevronDown
+                            size={18}
+                            className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                          />
+                        </div>
+                        {formData.province === "Outra" && (
+                          <div className="mt-4">
+                            <input
+                              type="text"
+                              required
+                              value={formData.customProvince}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  customProvince: e.target.value,
+                                })
+                              }
+                              className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300 font-bold"
+                              placeholder="Escreva a sua província..."
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                          Bairro, Zona, Município
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.area}
+                          onChange={(e) =>
+                            setFormData({ ...formData, area: e.target.value })
+                          }
+                          className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300 font-bold"
+                          placeholder="Ex: Talatona, Rua 4, perto do banco..."
+                        />
+                      </div>
+                      <div className="sm:col-span-2 flex flex-col gap-4">
+                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">
+                          Quantas unidades?
+                        </label>
+                        <div className="flex gap-3">
+                          {[1, 2, 3, 4].map((q) => (
+                            <button
+                              key={q}
+                              type="button"
+                              onClick={() =>
+                                setFormData({ ...formData, quantity: q })
+                              }
+                              className={`flex-1 py-4 rounded-2xl border-2 transition-all font-black flex flex-col items-center justify-center gap-1 ${formData.quantity === q ? "bg-indigo-50 border-indigo-500 text-indigo-700 shadow-lg shadow-indigo-500/10" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"}`}
+                            >
+                              <span className="text-xl">{q}</span>
+                              <span className="text-[10px] uppercase tracking-wider">
+                                {q === 1 ? "Unidade" : "Unidades"}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-6">
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className={`w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg py-5 rounded-3xl shadow-2xl shadow-emerald-500/30 transition-all transform active:scale-95 flex flex-col justify-center items-center ${isSubmitting ? "opacity-70 cursor-wait" : "hover:-translate-y-1"}`}
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="animate-spin" size={32} />
+                        ) : (
+                          <>
+                            <span>EFECTUAR MINHA RESERVA AGORA</span>
+                            <span className="text-[10px] opacity-90 font-black uppercase tracking-[0.2em] mt-1.5">
+                              Pagas só no momento da entrega
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </section>
+            </div>
+
+            {/* BLOCO 8: PROVAS SOCIAIS */}
+            <section className="mb-24 px-4 bg-slate-50 py-20 border-y border-slate-200">
+              <div className="text-center mb-16">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-4 tracking-tight">
+                  Quem comprou, recomenda!
+                </h2>
+                <p className="text-slate-500 font-medium max-w-lg mx-auto">
+                  Vê o que os nossos clientes dizem sobre a eficácia do Secador
+                  Inteligente UV.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                {[
+                  {
+                    name: "Joana B.",
+                    text: "O chulé dos ténis de ginásio do meu marido acabou. A luz UV realmente faz diferença. Super prático!",
+                  },
+                  {
+                    name: "Miguel A.",
+                    text: "Trabalho de fato e os meus sapatos clássicos estão sempre impecáveis agora. Seca por dentro sem estragar o couro.",
+                  },
+                  {
+                    name: "Sofia T.",
+                    text: "Moro no Kilamba e na época das chuvas era um pesadelo secar as sapatilhas das crianças. Este aparelho resolveu tudo.",
+                  },
+                  {
+                    name: "André L.",
+                    text: "Incrível para quem viaja muito como eu. Leve e cabe em qualquer canto da mala. Meus pés agradecem.",
+                  },
+                ].map((t, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col h-full group hover:shadow-xl transition-all"
+                  >
+                    <div className="flex gap-1 mb-6 text-amber-400">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Star key={i} size={16} fill="currentColor" />
+                      ))}
+                    </div>
+                    <p className="text-sm text-slate-600 mb-8 italic leading-relaxed flex-grow">
+                      "{t.text}"
+                    </p>
+                    <div className="flex items-center gap-3 pt-6 border-t border-slate-50">
+                      <div className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-md">
+                        {t.name.charAt(0)}
+                      </div>
+                      <span className="text-sm font-bold text-slate-900">
+                        {t.name}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* BLOCO 9: GARANTIA */}
+            <div className="max-w-4xl mx-auto px-4 mb-24">
+              <div className="bg-indigo-900 text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden ring-8 ring-indigo-500/10">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[100px] -mr-32 -mt-32" />
+                <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+                  <div className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center shrink-0 border border-white/20">
+                    <ShieldCheck size={56} className="text-indigo-200" />
+                  </div>
+                  <div className="text-center md:text-left">
+                    <h2 className="text-2xl sm:text-3xl font-black mb-4 tracking-tight">
+                      Garantia Blindada C Store
+                    </h2>
+                    <p className="text-indigo-100 text-lg leading-relaxed font-medium">
+                      Compra sem risco. Se o produto chegar com defeito ou não
+                      funcionar como prometido, entre em contacto pelo WhatsApp
+                      e resolvemos. Sem complicação.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <section className="mb-24 text-left max-w-4xl mx-auto px-4">
+              <h2 className="text-3xl font-black text-slate-900 mb-12 tracking-tight text-center">
+                Tire todas as suas dúvidas
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  {
+                    q: "Quanto tempo demora a entrega em Luanda?",
+                    a: "A entrega é feita no mesmo dia ou em até 24h úteis após a confirmação do pedido.",
+                  },
+                  {
+                    q: "O secador cabe em sapatos de criança?",
+                    a: "Sim! O modelo é de bicos curtos e ajusta-se perfeitamente a sapatos de criança, adultos e até botas.",
+                  },
+                  {
+                    q: "Preciso pagar antes de receber?",
+                    a: "Em Luanda o pagamento é feito apenas no acto da entrega. Outras províncias via transportadora (Sob-Consulta).",
+                  },
+                  {
+                    q: "Posso deixar a noite toda ligado?",
+                    a: "Sim. O sistema de temperatura constante e o temporizador garantem total segurança.",
+                  },
+                ].map((item, i) => (
+                  <div
+                    key={i}
+                    className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm"
+                  >
+                    <h3 className="font-bold text-slate-900 mb-2 leading-tight">
+                      {item.q}
+                    </h3>
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      {item.a}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </main>
+      )}
+
+      {/* SALES ROUPAS VIEW */}
+      {view === "sales-roupas" && (
+        <main className="pb-24 text-center">
+          <section className="pt-10 pb-6 px-4 max-w-4xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8"
+            >
+              <div className="inline-block bg-sky-100 text-sky-800 font-bold px-4 py-1.5 rounded-full text-xs sm:text-sm mb-6 border border-sky-200">
+                A solução para quem vive em apartamento em Luanda
+              </div>
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-slate-900 leading-[1.1] mb-8 tracking-tight px-2">
+                A solução definitiva para secar e higienizar a sua roupa de
+                forma prática e rápida.
+              </h1>
+
+              {/* Product Gallery */}
+              <div className="bg-white p-3 rounded-[2rem] shadow-2xl border border-slate-200 inline-block w-full mb-12">
+                <div className="relative aspect-square sm:aspect-video rounded-2xl overflow-hidden bg-slate-100 w-full mb-4 group shadow-inner">
+                  <AnimatePresence mode="wait">
+                    <motion.img
+                      key={activeImage}
+                      src={IMAGES_ROUPAS[activeImage]}
+                      initial={{ opacity: 0, scale: 1.1 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 1.05 }}
+                      transition={{ duration: 0.6 }}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </AnimatePresence>
+                </div>
+                {/* Thumbnails arranged better for mobile */}
+                <div className="flex gap-3 overflow-x-auto pb-4 pt-2 px-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {IMAGES_ROUPAS.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveImage(i)}
+                      className={`shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden snap-center transition-all ${
+                        activeImage === i
+                          ? "ring-4 ring-sky-500 opacity-100 scale-105"
+                          : "ring-1 ring-slate-200 opacity-60 hover:opacity-100 hover:scale-105"
+                      }`}
+                    >
+                      <img
+                        src={img}
+                        alt={`Thumbnail ${i}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto font-medium leading-relaxed">
+                O Secador Expresso Pro seca qualquer peça em 1 a 2 horas — roupa
+                íntima, camisas, calças, uniformes escolares — de forma
+                eficiente e sem complicações.
+              </p>
+
+              <div className="max-w-xl mx-auto mb-16 text-left">
+                <h3 className="font-bold text-slate-400 uppercase tracking-widest text-[10px] mb-6 text-center">
+                  Reconheces alguma destas situações?
+                </h3>
+                <div className="grid grid-cols-1 gap-3">
+                  {[
+                    "Vives num apartamento sem varanda ou sem sol directo",
+                    "Tens vergonha de deixar roupa íntima na varanda comum dos vizinhos",
+                    "As tuas camisas e calças ficam desirmanadas e ainda saem húmidas",
+                    "O uniforme escolar das crianças precisa de estar seco até amanhã de manhã",
+                    "A tua roupa fica com cheiro a bafio e fica ao amanhecer de fungos por causa da humidade",
+                    "Detestas apalpar roupa pelo sofá, quarto e casa de banho durante dias",
+                  ].map((text, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-100"
+                    >
+                      <div className="bg-red-50 text-red-500 rounded-full p-1">
+                        <TriangleAlert size={18} />
+                      </div>
+                      <span className="text-slate-700 font-semibold text-[15px] leading-snug">
+                        {text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* BLOCO 4: SECA TUDO */}
+              <div className="mb-24 py-12 bg-slate-50 -mx-4 px-6 rounded-[3rem] border border-slate-200">
+                <div className="max-w-4xl mx-auto">
+                  <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">
+                    Seca tudo — sem excepções
+                  </h2>
+                  <p className="text-slate-500 mb-10 font-medium">
+                    Das tuas roupas de casa às fatos, tudo seco em 1 a 2 horas.
+                  </p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-left">
+                    {[
+                      { title: "Roupa Íntima", desc: "Seca em 1 hora" },
+                      { title: "Uniformes Escolares", desc: "Sempre pronto" },
+                      { title: "Camisas de Trabalho", desc: "Sem amarrotar" },
+                      { title: "Roupas de Desporto", desc: "Sem bafio" },
+                    ].map((item, i) => (
+                      <div
+                        key={i}
+                        className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center"
+                      >
+                        <div className="bg-sky-100 text-sky-600 w-10 h-10 rounded-full flex items-center justify-center mb-4 font-black">
+                          ✓
+                        </div>
+                        <h4 className="font-bold text-slate-900 mb-1 text-sm md:text-base leading-tight">
+                          {item.title}
+                        </h4>
+                        <p className="text-xs text-slate-500 font-medium">
+                          {item.desc}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* BLOCO 5: TABELA COMPARATIVA */}
+              <div className="mb-24 px-4 overflow-hidden">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-10 tracking-tight">
+                  Estendal Tradicional VS Secador Expresso
+                </h2>
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden max-w-2xl mx-auto">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[300px]">
+                      <thead>
+                        <tr className="bg-slate-50">
+                          <th className="p-4 border-b border-slate-100 font-black text-slate-400 uppercase text-[10px] tracking-widest">
+                            Critério
+                          </th>
+                          <th className="p-4 border-b border-slate-100 font-bold text-slate-700 bg-slate-100/50 text-center">
+                            Estendal
+                          </th>
+                          <th className="p-4 border-b border-slate-100 font-bold text-sky-600 bg-sky-50 text-center">
+                            Secador Expresso
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-[13px] sm:text-sm">
+                        {[
+                          {
+                            c: "⭐ Tempo de secagem",
+                            t: "3 a 24h",
+                            s: "1 a 2 horas",
+                            highlight: true,
+                          },
+                          {
+                            c: "Roupa íntima",
+                            t: "Exposição total",
+                            s: "Privacidade total",
+                          },
+                          {
+                            c: "⭐ Fungos e bafio",
+                            t: "Frequente",
+                            s: "Eliminado",
+                            highlight: true,
+                          },
+                          {
+                            c: "Espaço necessário",
+                            t: "Varanda / 2m²",
+                            s: "Cabe numa mochila",
+                          },
+                          {
+                            c: "Resultado",
+                            t: "Depende do clima",
+                            s: "Seca, limpa, sem odor",
+                          },
+                        ].map((row, i) => (
+                          <tr
+                            key={i}
+                            className={`hover:bg-slate-50 transition-colors ${row.highlight ? "bg-sky-50/50" : ""}`}
+                          >
+                            <td
+                              className={`p-4 border-b border-slate-50 font-bold text-slate-800 ${row.highlight ? "bg-sky-100/30" : ""}`}
+                            >
+                              {row.c}
+                            </td>
+                            <td className="p-4 border-b border-slate-50 text-slate-500 text-center">
+                              {row.t}
+                            </td>
+                            <td
+                              className={`p-4 border-b border-slate-50 font-bold text-center ${row.highlight ? "text-sky-700" : "text-slate-900"}`}
+                            >
+                              {row.s}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* BLOCO 6: COMO FUNCIONA */}
+              <div className="mb-24">
+                <h2 className="text-3xl font-black text-slate-900 mb-12 tracking-tight">
+                  Simples assim — 3 passos e a roupa está seca
+                </h2>
+                <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                  <div className="relative p-8 bg-slate-50 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                    <div className="text-4xl mb-6">👕</div>
+                    <h4 className="font-bold text-slate-900 mb-2">Passo 1</h4>
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      Pendura as peças no secador — roupa íntima, camisas,
+                      calças, o que precisares.
+                    </p>
+                  </div>
+                  <div className="relative p-8 bg-slate-50 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                    <div className="text-4xl mb-6">🔌</div>
+                    <h4 className="font-bold text-slate-900 mb-2">Passo 2</h4>
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      Liga o tomada e define o tempo com o temporizador — sem
+                      app, sem complicação.
+                    </p>
+                  </div>
+                  <div className="relative p-8 bg-slate-50 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                    <div className="text-4xl mb-6">✅</div>
+                    <h4 className="font-bold text-slate-900 mb-2">Passo 3</h4>
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      Em 1 a 2 horas a roupa está completamente seca, sem cheiro
+                      e sem fungos.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* BLOCO 7: ESPECIFICAÇÕES TÉCNICAS */}
+              <div className="mt-20 text-left max-w-3xl mx-auto mb-20 px-4">
+                <h2 className="text-2xl font-bold text-slate-800 mb-8 text-center">
+                  Especificações Técnicas
+                </h2>
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="divide-y divide-slate-100">
+                    <div className="p-5 grid grid-cols-2 gap-4 hover:bg-slate-50 transition-colors">
+                      <span className="font-bold text-slate-600">Potência</span>
+                      <span className="font-bold text-slate-900 text-right">
+                        800W
+                      </span>
+                    </div>
+                    <div className="p-5 grid grid-cols-2 gap-4 hover:bg-slate-50 transition-colors">
+                      <span className="font-bold text-slate-600">Material</span>
+                      <span className="font-bold text-slate-900 text-right">
+                        ABS Ignífugo + Cabide Alumínio
+                      </span>
+                    </div>
+                    <div className="p-5 grid grid-cols-2 gap-4 hover:bg-slate-50 transition-colors">
+                      <span className="font-bold text-slate-600">
+                        Aquecimento
+                      </span>
+                      <span className="font-bold text-slate-900 text-right">
+                        PTC Automático
+                      </span>
+                    </div>
+                    <div className="p-5 grid grid-cols-2 gap-4 hover:bg-slate-50 transition-colors">
+                      <span className="font-bold text-slate-600">
+                        Dimensões
+                      </span>
+                      <span className="font-bold text-slate-900 text-right">
+                        32 × 34 × 15 cm
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </section>
+
+          {/* Testimonials */}
+          {/* BLOCO 8: PROVAS SOCIAIS */}
+          <section className="mb-24 px-4 py-20 bg-slate-50 border-y border-slate-200">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-4 tracking-tight">
+                Quem comprou, recomenda!
+              </h2>
+              <p className="text-slate-500 font-medium max-w-lg mx-auto">
+                Vê o que os nossos clientes dizem sobre a praticidade do Secador
+                Expresso Pro.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+              {[
+                {
+                  name: "Ana P.",
+                  text: "Moro num apartamento pequeno sem varanda. Antes as roupas ficavam com cheiro estranho, agora em 2h está tudo seco e cheiroso. Salvou-me!",
+                },
+                {
+                  name: "Carlos M.",
+                  text: "Incrível para as minhas camisas. Coloco à noite e de manhã estão impecáveis e secas. Recomendo para quem tem pressa.",
+                },
+                {
+                  name: "Marta S.",
+                  text: "O uniforme do meu filho já não é um problema. Lavo à noite, seco no aparelho e de manhã está pronto. Muito fácil de usar.",
+                },
+                {
+                  name: "José B.",
+                  text: "Muito prático. Levo até nas viagens de trabalho. Silencioso e não ocupa quase nada de espaço na mala.",
+                },
+              ].map((t, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col h-full group hover:shadow-xl transition-all"
+                >
+                  <div className="flex gap-1 mb-6 text-amber-400">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Star key={i} size={16} fill="currentColor" />
+                    ))}
+                  </div>
+                  <p className="text-sm text-slate-600 mb-8 italic leading-relaxed flex-grow">
+                    "{t.text}"
+                  </p>
+                  <div className="flex items-center gap-3 pt-6 border-t border-slate-50">
+                    <div className="w-10 h-10 bg-sky-600 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-md">
+                      {t.name.charAt(0)}
+                    </div>
+                    <span className="text-sm font-bold text-slate-900">
+                      {t.name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* BLOCO 9: GARANTIA */}
+          <div className="max-w-4xl mx-auto px-4 mb-24">
+            <div className="bg-indigo-900 text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden ring-8 ring-indigo-500/10">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[100px] -mr-32 -mt-32" />
+              <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+                <div className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center shrink-0 border border-white/20">
+                  <ShieldCheck size={56} className="text-indigo-200" />
+                </div>
+                <div className="text-center md:text-left">
+                  <h2 className="text-2xl sm:text-3xl font-black mb-4 tracking-tight">
+                    Garantia Blindada C Store
+                  </h2>
+                  <p className="text-indigo-100 text-lg leading-relaxed font-medium">
+                    Compra sem risco. Se o produto chegar com defeito ou não
+                    funcionar como prometido, entre em contacto pelo WhatsApp e
+                    resolvemos. Sem complicação.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* BLOCO 10 & 11: PREÇOS E CHECKOUT */}
+          <div id="comprar" className="pt-8 scroll-mt-20 px-4 mb-20">
+            <section className="bg-white rounded-[3.5rem] shadow-2xl border border-slate-200 overflow-hidden max-w-6xl mx-auto flex flex-col-reverse lg:flex-row">
+              {/* Esquerda: Info e Benefícios */}
+              <div className="lg:w-[42%] bg-sky-600 p-10 text-white flex flex-col relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-[100px] -mr-32 -mt-32" />
+
+                <div className="relative z-10 mb-auto">
+                  <div className="inline-block bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-6 border border-white/20">
+                    Oferta por Tempo Limitado
+                  </div>
+                  <h2 className="text-3xl sm:text-5xl font-black mb-8 leading-tight tracking-tight">
+                    Adeus humidade.
+                    <br />
+                    Olá praticidade.
+                  </h2>
+
+                  <div className="space-y-4 mb-12">
+                    {[
+                      "Entregas Exclusivas em Luanda",
+                      "Pronta Entrega com Pagamento no Acto da Entrega",
+                      "Entrega Rápida e com Período Agendado",
+                      "Garantia de Satisfação total",
+                      "Suporte via WhatsApp 24/7",
+                    ].map((item, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-4 text-[15px] font-bold bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10"
+                      >
+                        <div className="bg-white text-sky-600 p-1 rounded-full">
+                          <CheckCircle size={16} />
+                        </div>
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="relative z-10 p-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
+                  <p className="text-sky-100 text-sm mb-4 font-bold">
+                    +500 famílias satisfeitas em Angola
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex -space-x-3">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className="w-10 h-10 rounded-full border-2 border-sky-600 bg-slate-200 overflow-hidden ring-2 ring-sky-500/50"
+                        >
+                          <img
+                            src={`https://i.pravatar.cc/100?img=${i + 20}`}
+                            alt="User"
+                          />
+                        </div>
+                      ))}
+                      <div className="w-10 h-10 rounded-full border-2 border-sky-600 bg-emerald-500 flex items-center justify-center text-[10px] font-black text-white ring-2 ring-sky-500/50">
+                        +500
+                      </div>
+                    </div>
+                    <div className="h-8 w-px bg-white/20 mx-2" />
+                    <div className="text-amber-400 flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Star key={i} size={14} fill="currentColor" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Direita: Formulário */}
+              <div className="lg:w-[58%] p-8 sm:p-12">
+                <div className="text-center sm:text-left mb-12 relative flex flex-col items-center sm:items-start">
+                  <div className="bg-red-500 text-white font-black py-2 px-5 rounded-full text-xs shadow-xl animate-bounce mb-6">
+                    POUPA{" "}
+                    {new Intl.NumberFormat("pt-AO").format(
+                      formData.quantity * 10000,
+                    )}{" "}
+                    KZ HOJE
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-slate-400 line-through text-2xl font-bold tracking-tight">
+                      {new Intl.NumberFormat("pt-AO").format(
+                        formData.quantity * 45000,
+                      )}{" "}
+                      Kz
+                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-7xl font-black text-slate-900 tracking-tighter">
+                        {new Intl.NumberFormat("pt-AO").format(
+                          formData.quantity * 35000,
+                        )}
+                      </span>
+                      <span className="text-2xl font-black text-slate-400">
+                        Kz
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-slate-500 font-bold flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />{" "}
+                    Em Stock - Pronta Entrega
+                  </p>
+                </div>
+
+                <form onSubmit={handleFormSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                        Nome Completo
+                      </label>
+                      <input
+                        id="name-input-roupas"
+                        ref={nameInputRoupasRef}
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white focus:ring-4 focus:ring-sky-100 focus:border-sky-500 outline-none transition-all placeholder:text-slate-300 font-bold"
+                        placeholder="Ex: Marta Silva"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                        Número de WhatsApp
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={formData.phone}
+                        onChange={(e) =>
+                          setFormData({ ...formData, phone: e.target.value })
+                        }
+                        className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white focus:ring-4 focus:ring-sky-100 focus:border-sky-500 outline-none transition-all placeholder:text-slate-300 font-bold"
+                        placeholder="Ex: 921 167 980"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2 px-1">
+                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                          Província
+                        </label>
+                        <span className="text-[10px] font-black text-sky-800 bg-sky-100 px-2.5 py-0.5 rounded-full border border-sky-300 flex items-center gap-1">
+                          📍 Apenas Luanda
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          readOnly
+                          value="Luanda (Entregas Exclusivas)"
+                          className="w-full px-6 py-4 bg-slate-100/90 rounded-2xl border border-slate-200 focus:outline-none font-black text-slate-700 cursor-not-allowed select-none"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-1.5 px-1">
+                        🚚 Entregas rápidas e pagamento em mãos disponíveis <strong>exclusivamente para a província de Luanda</strong>.
+                      </p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                        Bairro, Zona, Município
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.area}
+                        onChange={(e) =>
+                          setFormData({ ...formData, area: e.target.value })
+                        }
+                        className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white focus:ring-4 focus:ring-sky-100 focus:border-sky-500 outline-none transition-all placeholder:text-slate-300 font-bold"
+                        placeholder="Ex: Talatona, Rua 4, perto do banco..."
+                      />
+                    </div>
+
+                    {/* Data e Período de Entrega */}
+                    <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1 flex items-center gap-1.5">
+                          <Calendar size={13} className="text-sky-600" />
+                          Data Desejada para Entrega
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={formData.deliveryDate}
+                          min={new Date().toISOString().split("T")[0]}
+                          onChange={(e) =>
+                            setFormData({ ...formData, deliveryDate: e.target.value })
+                          }
+                          className="w-full px-5 py-4 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white focus:ring-4 focus:ring-sky-100 focus:border-sky-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-1">
+                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1 flex items-center gap-1.5">
+                          <Clock size={13} className="text-sky-600" />
+                          Período Selecionado
+                        </label>
+                        <div className="px-5 py-4 bg-sky-50/70 border border-sky-200 rounded-2xl text-sky-950 font-bold text-sm flex items-center justify-between">
+                          <span>{formData.deliveryPeriod}</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                        Escolha o Período do Dia para Receber a Entrega
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {[
+                          {
+                            id: "Manhã (08:00 às 12:00)",
+                            label: "Manhã",
+                            time: "08:00 às 12:00",
+                            icon: "☀️",
+                            desc: "Ideal para início do dia",
+                          },
+                          {
+                            id: "Tarde (12:00 às 16:00)",
+                            label: "Tarde",
+                            time: "12:00 às 16:00",
+                            icon: "⛅",
+                            desc: "Meio do dia / almoço",
+                          },
+                          {
+                            id: "Final do dia (16:00 às 18:00)",
+                            label: "Final do dia",
+                            time: "16:00 às 18:00",
+                            icon: "🌆",
+                            desc: "Fim da tarde / regresso",
+                          },
+                        ].map((period) => {
+                          const isSelected = formData.deliveryPeriod === period.id;
+                          return (
+                            <button
+                              key={period.id}
+                              type="button"
+                              onClick={() =>
+                                setFormData({ ...formData, deliveryPeriod: period.id })
+                              }
+                              className={`p-4 rounded-2xl border-2 transition-all font-bold flex flex-col items-center justify-center text-center cursor-pointer relative ${
+                                isSelected
+                                  ? "bg-sky-50 border-sky-500 text-sky-900 shadow-md shadow-sky-500/10 ring-2 ring-sky-500/20"
+                                  : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50"
+                              }`}
+                            >
+                              <span className="text-xl mb-1">{period.icon}</span>
+                              <span className="text-sm font-black">{period.label}</span>
+                              <span className="text-xs text-slate-500 font-semibold mt-0.5">
+                                {period.time}
+                              </span>
+                              {isSelected && (
+                                <div className="absolute top-2 right-2 text-sky-600">
+                                  <CheckCircle size={14} />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-2 flex flex-col gap-4">
+                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">
+                        Quantas unidades?
+                      </label>
+                      <div className="flex gap-3">
+                        {[1, 2, 3, 4].map((q) => (
+                          <button
+                            key={q}
+                            type="button"
+                            onClick={() =>
+                              setFormData({ ...formData, quantity: q })
+                            }
+                            className={`flex-1 py-4 rounded-2xl border-2 transition-all font-black flex flex-col items-center justify-center gap-1 ${formData.quantity === q ? "bg-sky-50 border-sky-500 text-sky-700 shadow-lg shadow-sky-500/10" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"}`}
+                          >
+                            <span className="text-xl">{q}</span>
+                            <span className="text-[10px] uppercase tracking-wider">
+                              {q === 1 ? "Unidade" : "Unidades"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className={`w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg py-5 rounded-3xl shadow-2xl shadow-emerald-500/30 transition-all transform active:scale-95 flex flex-col justify-center items-center ${isSubmitting ? "opacity-70 cursor-wait" : "hover:-translate-y-1"}`}
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="animate-spin" size={32} />
+                      ) : (
+                        <>
+                          <span>CONFIRMAR MEU PEDIDO AGORA</span>
+                          <span className="text-[10px] opacity-90 font-black uppercase tracking-[0.2em] mt-1.5">
+                            Pagas só no momento da entrega em mãos
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-center text-[11px] text-slate-400 font-bold uppercase tracking-widest">
+                    🔒 Pagamento Seguro no Acto da Entrega
+                  </p>
+                </form>
+              </div>
+            </section>
+          </div>
+
+          <section className="mb-24 text-left max-w-2xl mx-auto px-4">
+            <h2 className="text-3xl font-black text-slate-900 mb-12 tracking-tight text-center">
+              As tuas dúvidas respondidas de forma honesta
+            </h2>
+            <div className="space-y-4">
+              {FAQ_ROUPAS.map((item, i) => (
+                <AccordionItem key={i} question={item.q} answer={item.a} />
+              ))}
+            </div>
+          </section>
+        </main>
+      )}
+
+      {/* SALES ROTEADOR VIEW */}
+      {view === "sales-roteador" && (
+        <main className="bg-[#0b0f19] text-slate-300 min-h-screen selection:bg-cyan-500/30 pb-24 overflow-x-hidden font-sans">
+          
+          {/* Hero Section */}
+          <section className="relative pt-12 sm:pt-24 pb-20 px-4 max-w-7xl mx-auto">
+            {/* Ambient Base Blur */}
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[400px] bg-cyan-700/20 blur-[120px] rounded-full pointer-events-none"></div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20 relative z-10"
+            >
+              {/* Lado Esquerdo: Texto (Cyber/Tech Style) */}
+              <div className="w-full lg:w-1/2 text-center lg:text-left flex flex-col justify-center order-2 lg:order-1">
+                <div className="inline-flex items-center justify-center lg:justify-start gap-2 text-cyan-400 font-bold mb-6 mx-auto lg:mx-0 w-fit">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/30">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping absolute"></span>
+                    <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                  </div>
+                  <span className="tracking-widest text-xs uppercase">Conexão Ilimitada Luanda</span>
+                </div>
+                <h1 className="text-4xl sm:text-5xl md:text-[4rem] font-black text-white leading-[1.05] tracking-tight mb-8">
+                  Roteador 5G Ultra Desbloqueado: Use qualquer operadora livremente.
+                </h1>
+                <p className="text-lg text-slate-400 mb-10 font-normal leading-relaxed max-w-xl mx-auto lg:mx-0">
+                  Diga adeus aos limites de 500GB mensais. Com este equipamento <strong className="text-cyan-400 font-bold">100% livre</strong>, você tem acesso imediato aos roteamentos ilimitados da rede Africel e outras operadoras, garantindo Wi-Fi 6 veloz.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                  <button
+                    onClick={handleScrollToCheckout}
+                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-4 px-8 rounded-2xl transition-all shadow-[0_0_40px_rgba(6,182,212,0.3)] hover:shadow-[0_0_60px_rgba(6,182,212,0.5)] active:scale-95 text-lg w-full sm:w-auto"
+                  >
+                    COMPRAR AGORA
+                  </button>
+                  <button
+                    onClick={() => document.getElementById("recursos")?.scrollIntoView({ behavior: "smooth" })}
+                    className="bg-transparent hover:bg-white/5 text-white font-bold py-4 px-8 rounded-2xl transition-all active:scale-95 border border-white/10 w-full sm:w-auto backdrop-blur-sm"
+                  >
+                    VER RECURSOS
+                  </button>
+                </div>
+              </div>
+
+              {/* Lado Direito: Imagem Hero */}
+              <div className="w-full lg:w-1/2 order-1 lg:order-2">
+                <div className="relative w-full aspect-square sm:aspect-[4/3] flex items-center justify-center">
+                  {/* Glowing backdrop rings */}
+                  <div className="absolute inset-0 rounded-full border border-cyan-500/20 scale-75 animate-[spin_30s_linear_infinite]"></div>
+                  <div className="absolute inset-0 rounded-full border border-blue-500/20 scale-90 animate-[spin_40s_linear_infinite_reverse]"></div>
+                  
+                  {/* Main Image */}
+                  <AnimatePresence mode="wait">
+                    <motion.img
+                      key={activeImage}
+                      src={IMAGES_ROTEADOR[activeImage]}
+                      initial={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
+                      animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                      exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
+                      transition={{ duration: 0.5 }}
+                      className="absolute inset-0 w-full h-full object-contain z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] scale-[1.15]"
+                      referrerPolicy="no-referrer"
+                    />
+                  </AnimatePresence>
+                </div>
+
+                {/* Thumbnails Row */}
+                <div className="flex gap-4 justify-center mt-6 z-20 relative">
+                  {IMAGES_ROTEADOR.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveImage(i)}
+                      className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden transition-all bg-white/5 backdrop-blur-md border ${
+                        activeImage === i
+                          ? "border-cyan-400 opacity-100 scale-110 shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+                          : "border-white/10 opacity-50 hover:opacity-100 hover:scale-105"
+                      }`}
+                    >
+                      <img
+                        src={img}
+                        alt={`Vista ${i+1}`}
+                        className="w-full h-full object-contain p-2"
+                        referrerPolicy="no-referrer"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </section>
+
+          {/* Dores (Motivos) */}
+          <section className="px-4 py-20 relative border-t border-white/5">
+            <div className="max-w-7xl mx-auto">
+              <div className="text-center mb-16">
+                <h2 className="text-2xl sm:text-4xl font-black text-white mb-4">
+                  A sua operadora deixou-o sem opções?
+                </h2>
+                <p className="text-slate-400 max-w-2xl mx-auto">
+                  Os cortes abruptos na internet por novos limites de GB afectam milhares de lares em Luanda. Aqui está o porquê de precisar deste roteador.
+                </p>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+                {[
+                  { title: "Limites de Tráfego", desc: "A internet corta a meio do mês e exige recargas absurdamente caras." },
+                  { title: "Roteador Bloqueado", desc: "Com o aparelho antigo, não podes usar a rede concorrente que é mais barata." },
+                  { title: "Instabilidade Crónica", desc: "Nas horas de ponta, ver vídeos em 1080p ou 4K vira uma tortura de buffering." },
+                  { title: "Poucos Dispositivos", desc: "Se ligarem mais do que 4 telefones, a rede vai abaixo constantemente." }
+                ].map((item, i) => (
+                  <div key={i} className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-[2rem] hover:bg-white/10 transition-colors group">
+                    <div className="w-12 h-12 bg-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-center mb-6 border border-rose-500/20 group-hover:bg-rose-500 group-hover:text-white transition-all">
+                      <TriangleAlert size={24} />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">{item.title}</h3>
+                    <p className="text-slate-400 leading-relaxed">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Funcionalidades Bento Grid */}
+          <section id="recursos" className="px-4 py-20 relative bg-black/50 border-y border-white/5 scroll-mt-10">
+            <div className="max-w-7xl mx-auto">
+              <div className="text-center mb-16">
+                <span className="text-cyan-400 font-bold tracking-widest uppercase text-xs">Especificações Base</span>
+                <h2 className="text-3xl sm:text-5xl font-black text-white mt-3 mb-6">
+                  ZTE 5G Ultra Wi-Fi 6
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2 bg-gradient-to-br from-indigo-900/40 to-[#0b0f19] border border-white/10 p-8 sm:p-12 rounded-[2.5rem] relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 blur-[100px] rounded-full group-hover:bg-cyan-500/20 transition-all"></div>
+                  <div className="relative z-10 w-full h-full flex flex-col justify-end">
+                    <div className="w-16 h-16 bg-cyan-500 rounded-3xl flex items-center justify-center text-slate-950 mb-8 font-black text-2xl shadow-[0_0_30px_rgba(6,182,212,0.5)]">
+                      5G
+                    </div>
+                    <h3 className="text-3xl md:text-5xl font-black text-white mb-4">Velocidade Absurda<br/>até 3.6 Gbps</h3>
+                    <p className="text-slate-400 max-w-md text-lg">Faça downloads pesados em segundos, jogue online sem ping e usufrua de streaming 4K instantâneo.</p>
+                  </div>
+                </div>
+                
+                <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] flex flex-col">
+                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white mb-6">
+                    <ShieldCheck size={24} />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-3">100% Desbloqueado</h3>
+                  <p className="text-slate-400 text-sm flex-grow">A liberdade é sua. Funciona com chips da Africel, Unitel ou Movicel indubitavelmente.</p>
+                </div>
+                
+                <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] flex flex-col">
+                   <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white mb-6">
+                      <Zap size={24} />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-3">Wi-Fi 6 & NFC</h3>
+                    <p className="text-slate-400 text-sm">Emparelhe o telemóvel por NFC com um simples toque. A rede tem menor latência e suporta mais dispositivos.</p>
+                </div>
+
+                <div className="md:col-span-2 bg-gradient-to-tr from-slate-900/60 to-slate-800/60 border border-white/10 p-8 sm:p-10 rounded-[2.5rem] flex items-center overflow-hidden relative">
+                   <div className="absolute right-0 bottom-0 text-[10rem] font-black leading-none text-white/5 -mb-10 mr-10 select-none">
+                     32
+                   </div>
+                   <div className="relative z-10">
+                     <h3 className="text-2xl sm:text-4xl font-black text-white mb-3">Conecte até 32 Utilizadores</h3>
+                     <p className="text-slate-400 lg:max-w-xl text-lg">Ideal para casas grandes, condomínios ou escritórios empresariais onde ninguém pode ficar parado.</p>
+                   </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Comparativo Dark */}
+          <section className="px-4 py-20 relative">
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-12">
+                <h2 className="text-3xl sm:text-4xl font-black text-white">
+                  A Verdade sobre o Seu Roteador Atual
+                </h2>
+              </div>
+              
+              <div className="bg-[#0f1422] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[500px]">
+                    <thead>
+                      <tr>
+                        <th className="p-6 border-b border-white/5 font-black text-slate-500 uppercase text-xs tracking-widest w-1/3">Critério</th>
+                        <th className="p-6 border-b border-white/5 font-bold text-slate-400 bg-white/5 text-center w-1/3">O Atual (Padrão)</th>
+                        <th className="p-6 border-b border-cyan-500/30 font-bold text-cyan-400 bg-cyan-900/20 text-center w-1/3">ZTE 5G Ultra</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm">
+                      {[
+                        { label: "Velocidade Média", old: "10-20 Mbps", new: "Aceleração 5G Giga", hl: true },
+                        { label: "Rede / SIM", old: "Bloqueado à origem", new: "Totalmente Livre" },
+                        { label: "Dispositivos Sup.", old: "Até 10 simultâneos", new: "Até 32 simultâneos", hl: true },
+                        { label: "Wi-Fi", old: "Wi-Fi 4 / 5 Antigo", new: "Wi-Fi 6 c/ NFC" },
+                        { label: "Antenas", old: "Internas Fracas", new: "Super Direcional 360°" },
+                      ].map((row, i) => (
+                        <tr key={i} className="hover:bg-white/5 transition-colors">
+                          <td className="p-6 border-b border-white/5 font-bold text-white">{row.label}</td>
+                          <td className="p-6 border-b border-white/5 text-slate-500 text-center">{row.old}</td>
+                          <td className={`p-6 border-b border-white/5 font-bold text-center ${row.hl ? 'text-cyan-300 bg-cyan-900/20' : 'text-cyan-400 bg-cyan-900/10'}`}>
+                            {row.new}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Provas Sociais */}
+          <section className="py-20 relative bg-[#0b0f19] border-y border-white/5">
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/30 pointer-events-none"></div>
+            <div className="max-w-7xl mx-auto px-4 relative z-10">
+              <div className="text-center mb-16">
+                <h2 className="text-3xl font-black text-white">Compradores Satisfeitos</h2>
+                <p className="text-slate-400 mt-2">Vê quem já migrou para a internet sem limites.</p>
+              </div>
+              
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  { name: "Ana P.", letter: "A", text: "Antes a internet caía a meio da semana. Pus um chip novo e nunca mais sofri." },
+                  { name: "Carlos M.", letter: "C", text: "O ping em COD e Fortnite é surreal de tão baixo. Simplesmente mágico." },
+                  { name: "Marta S.", letter: "M", text: "Trabalho em home office, ligo tudo e nada falha. Melhor investimento do ano." },
+                  { name: "José B.", letter: "J", text: "Entrega super rápida. Desbloqueado de verdade, já testei Unitel e Africel." }
+                ].map((testimonial, i) => (
+                  <div key={i} className="bg-slate-900/50 border border-white/10 p-8 rounded-[2rem] flex flex-col relative group hover:-translate-y-2 transition-transform duration-300">
+                    <div className="flex gap-1 text-cyan-400 mb-6">
+                      {[1,2,3,4,5].map((s) => <Star key={s} size={14} fill="currentColor"/>)}
+                    </div>
+                    <p className="text-slate-300 italic flex-grow mb-8 text-sm leading-relaxed">"{testimonial.text}"</p>
+                    <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-500/50 flex justify-center items-center font-bold text-cyan-400">
+                         {testimonial.letter}
+                       </div>
+                       <span className="text-white font-bold">{testimonial.name}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Preços e Checkout Form (The main conversion point) */}
+          <section id="comprar" className="py-24 px-4 relative scroll-mt-0">
+            <div className="max-w-6xl mx-auto bg-slate-900 rounded-[3rem] border border-cyan-500/30 overflow-hidden shadow-[0_0_80px_rgba(6,182,212,0.15)] flex flex-col-reverse lg:flex-row relative">
+              
+              {/* Esquerda: Info e Urgência */}
+              <div className="lg:w-[45%] bg-gradient-to-b from-cyan-900 to-slate-900 p-10 sm:p-14 text-white relative">
+                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-cyan-500/20 blur-[120px] rounded-full pointer-events-none -mr-40 -mt-40"></div>
+                
+                <div className="relative z-10 h-full flex flex-col">
+                   <div className="inline-block bg-rose-500 text-white font-black px-4 py-1.5 rounded-full text-[10px] tracking-widest uppercase mb-10 shadow-[0_0_20px_rgba(244,63,94,0.4)] animate-pulse w-fit">
+                     Stock Ultra Limitado
+                   </div>
+                   
+                   <h2 className="text-4xl sm:text-5xl font-black leading-tight mb-8">
+                     O seu acesso<br/>à verdadeira<br/><span className="text-cyan-400">internet 5G</span>.
+                   </h2>
+                   
+                   <div className="space-y-4 mb-16">
+                    {[
+                      "Venda Exclusiva e Entrega Imediata",
+                      "Pagamentos SOMENTE no Acto da Entrega",
+                      "Suporte e Garantia Blindada"
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3 text-sm font-bold bg-black/20 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
+                        <CheckCircle size={18} className="text-cyan-400 shrink-0"/>
+                        {item}
+                      </div>
+                    ))}
+                   </div>
+                   
+                   <div className="mt-auto">
+                     <p className="text-cyan-200 text-sm font-medium opacity-80 mb-4 flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                       Em Stock • Entrega Gratuita p/ Luanda
+                     </p>
+                   </div>
+                </div>
+              </div>
+
+              {/* Direita: Formulário */}
+              <div className="lg:w-[55%] p-8 sm:p-14 relative bg-[#060911]">
+                 <div className="mb-12 text-center sm:text-left">
+                    <p className="text-slate-500 font-bold uppercase tracking-widest text-xs mb-3">Valor de Investimento</p>
+                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4 justify-center sm:justify-start">
+                       <p className="text-rose-500/60 line-through text-2xl font-black">
+                         {new Intl.NumberFormat("pt-AO").format(formData.quantity * 310000)} Kz
+                       </p>
+                       <div className="flex items-baseline gap-2">
+                         <span className="text-6xl sm:text-7xl font-black text-white tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                            {new Intl.NumberFormat("pt-AO").format(formData.quantity * 240000)}
+                         </span>
+                         <span className="text-xl font-bold text-cyan-500 uppercase tracking-widest">Kz</span>
+                       </div>
+                    </div>
+                    <div className="mt-4 inline-block bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-black text-[11px] px-4 py-2 rounded-full uppercase tracking-widest">
+                       Poupe {new Intl.NumberFormat("pt-AO").format(formData.quantity * 70000)} KZ hoje
+                    </div>
+                 </div>
+
+                 <form onSubmit={handleFormSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                       <div className="sm:col-span-2">
+                          <label className="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">Nome Completo</label>
+                          <input
+                            required
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                            className="w-full bg-[#0b0f19] border border-white/5 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none px-6 py-5 rounded-[1rem] text-white placeholder:text-slate-700 font-bold transition-all shadow-inner"
+                            placeholder="Ex: João Baptista"
+                          />
+                       </div>
+                       <div>
+                          <label className="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">WhatsApp</label>
+                          <input
+                            required
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                            className="w-full bg-[#0b0f19] border border-white/5 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none px-6 py-5 rounded-[1rem] text-white placeholder:text-slate-700 font-bold transition-all shadow-inner"
+                            placeholder="Ex: 923 000 000"
+                          />
+                       </div>
+                       <div>
+                          <label className="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">Província</label>
+                          <div className="relative">
+                            <select disabled className="w-full bg-[#0f1422] border border-white/5 outline-none px-6 py-5 rounded-[1rem] text-slate-600 appearance-none font-bold uppercase disabled:opacity-100 shadow-inner">
+                               <option>Somente Luanda</option>
+                            </select>
+                            <Lock size={14} className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-600" />
+                          </div>
+                       </div>
+                       <div className="sm:col-span-2">
+                          <label className="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">Endereço (Bairro/Município)</label>
+                          <input
+                            required
+                            type="text"
+                            value={formData.area}
+                            onChange={(e) => setFormData({...formData, area: e.target.value})}
+                            className="w-full bg-[#0b0f19] border border-white/5 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none px-6 py-5 rounded-[1rem] text-white placeholder:text-slate-700 font-bold transition-all shadow-inner"
+                            placeholder="Ex: Talatona, Rua 2"
+                          />
+                       </div>
+                       <div className="sm:col-span-2">
+                          <label className="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">Observações (Opcional)</label>
+                          <textarea
+                            rows={2}
+                            value={formData.observacoes || ""}
+                            onChange={(e) => setFormData({...formData, observacoes: e.target.value})}
+                            className="w-full bg-[#0b0f19] border border-white/5 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none px-6 py-5 rounded-[1rem] text-white placeholder:text-slate-700 font-bold transition-all resize-none shadow-inner"
+                            placeholder="Algum ponto de referência...?"
+                          />
+                       </div>
+                       <div className="sm:col-span-2">
+                          <label className="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-3">Quantidade (Aparelhos)</label>
+                          <div className="flex gap-3">
+                            {[1,2,3,4].map(q => (
+                              <button
+                                key={q} type="button"
+                                onClick={() => setFormData({...formData, quantity: q})}
+                                className={`flex-1 py-4 border ${q === formData.quantity ? 'bg-cyan-500 border-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.5)] scale-[1.02]' : 'bg-[#0b0f19] border-white/5 text-slate-500 hover:border-white/20'} rounded-[1rem] transition-all`}
+                              >
+                                {q}
+                              </button>
+                            ))}
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="pt-8">
+                       <button
+                         type="submit" disabled={isSubmitting}
+                         className={`w-full py-6 rounded-2xl font-black text-xl flex flex-col items-center justify-center transition-all bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-[0_0_40px_rgba(6,182,212,0.4)] hover:shadow-[0_0_60px_rgba(6,182,212,0.5)] ${isSubmitting ? 'opacity-70 scale-95 cursor-wait' : 'hover:-translate-y-1 active:scale-[0.98]'}`}
+                       >
+                         {isSubmitting ? (
+                           <Loader2 className="animate-spin" size={32} />
+                         ) : (
+                           <>
+                             <span>CONFIRMAR ENCOMENDA AGORA</span>
+                             <span className="text-[10px] uppercase tracking-[0.2em] mt-1.5 opacity-80">(Pagamento na Entrega)</span>
+                           </>
+                         )}
+                       </button>
+                    </div>
+                 </form>
+              </div>
+
+            </div>
+          </section>
+
+          {/* FAQ */}
+          <section className="px-4 py-20 pb-40 relative">
+             <div className="max-w-3xl mx-auto">
+               <div className="text-center mb-16">
+                 <h2 className="text-3xl font-black text-white">Perguntas Frequentes</h2>
+                 <p className="text-slate-400 mt-2">Dúvidas? Temos as respostas.</p>
+               </div>
+               <div className="space-y-4">
+                 {FAQ_ROTEADOR.map((item, i) => (
+                    <AccordionItem key={i} question={item.q} answer={item.a} isDarkTheme />
+                 ))}
+               </div>
+             </div>
+          </section>
+
+        </main>
+      )}
+
+      {/* SALES PAGE: BASE MÓVEL UNIVERSAL 360° */}
+      {view === "sales-base-movel" && (
+        <main className="bg-slate-950 text-slate-200 min-h-screen selection:bg-amber-500/30 pb-24 overflow-x-hidden font-sans">
+          
+          {/* Hero Section (BLOCO 1) */}
+          <section className="relative pt-12 sm:pt-20 pb-16 px-4 max-w-7xl mx-auto">
+            {/* Ambient Background Glow */}
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[400px] bg-amber-500/10 blur-[130px] rounded-full pointer-events-none"></div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16 relative z-10"
+            >
+              {/* Lado Esquerdo: Textos & Preço */}
+              <div className="w-full lg:w-1/2 text-center lg:text-left flex flex-col justify-center order-2 lg:order-1">
+                <div className="inline-flex items-center justify-center lg:justify-start gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold px-4 py-2 rounded-full text-xs uppercase tracking-wider mb-6 mx-auto lg:mx-0 w-fit backdrop-blur-md">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                  <span>🔥 Reserva Aberta — Unidades Limitadas em Luanda</span>
+                </div>
+
+                <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white leading-[1.1] tracking-tight mb-6">
+                  Mover o fogão, geladeira ou máquina <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">nunca foi tão fácil</span>
+                </h1>
+
+                <p className="text-base sm:text-lg text-slate-300 mb-6 font-normal leading-relaxed max-w-xl mx-auto lg:mx-0">
+                  A <strong>Base Móvel 360°</strong> coloca rodízios industriais debaixo do seu <strong>fogão, máquina de lavar, geladeira ou arca</strong>. Você desliza tudo com uma única mão — sem esforço, <strong>sem riscar o piso e sem o risco de partir os pés ou amolgar seus eletrodomésticos caros</strong>.
+                </p>
+
+                {/* Destaque para móveis pesados */}
+                <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl mb-8 backdrop-blur-md">
+                  <p className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-2">Ideal Para Equipamentos Pesados:</p>
+                  <p className="text-xs sm:text-sm text-slate-300 font-medium">
+                    🔥 Fogões de Cozinha • 🧊 Geladeiras & Frigoríficos • 🧺 Máquinas de Lavar • ❄️ Arcas Congeladoras • 📦 Outros Móveis Pesados
+                  </p>
+                </div>
+
+                {/* Âncora de Preço Hero */}
+                <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 p-5 rounded-2xl mb-8 flex items-center justify-between flex-wrap gap-4 max-w-xl mx-auto lg:mx-0">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded mb-1 inline-block">
+                      ✓ Pacote: 1 Par Completo (2 Bases)
+                    </span>
+                    <span className="text-xs text-slate-400 line-through block font-medium">Preço Normal: 30.000 Kz</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl sm:text-4xl font-black text-amber-400">15.000 Kz</span>
+                      <span className="text-xs font-bold bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md uppercase">50% OFF</span>
+                    </div>
+                  </div>
+                  <div className="text-right text-xs text-slate-400">
+                    <span className="text-emerald-400 font-bold block">✓ Economiza 15.000 Kz</span>
+                    <span className="text-slate-300 font-bold block">1 Par = 15.000 Kz</span>
+                    <span>Pagamento na entrega</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                  <button
+                    onClick={handleScrollToCheckout}
+                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-4 px-8 rounded-2xl transition-all shadow-[0_0_30px_rgba(245,158,11,0.35)] active:scale-95 text-base sm:text-lg flex items-center justify-center gap-3 w-full sm:w-auto"
+                  >
+                    <span>RESERVAR O MEU PAR AGORA (15.000 Kz)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Lado Direito: Galeria do Produto */}
+              <div className="w-full lg:w-1/2 order-1 lg:order-2">
+                <div className="relative w-full aspect-square sm:aspect-[4/3] flex items-center justify-center bg-slate-900/60 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl p-4">
+                  <AnimatePresence mode="wait">
+                    <motion.img
+                      key={activeImage}
+                      src={IMAGES_BASE_MOVEL[activeImage]}
+                      alt="Base Móvel 360° para Máquina de Lavar e Geladeira"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 1.05 }}
+                      transition={{ duration: 0.4 }}
+                      className="w-full h-full object-contain rounded-2xl"
+                      referrerPolicy="no-referrer"
+                    />
+                  </AnimatePresence>
+
+                  <div className="absolute top-4 right-4 bg-slate-950/80 border border-slate-800 text-amber-400 text-xs font-black px-3 py-1.5 rounded-full backdrop-blur-md">
+                    Giro 360° Industrial
+                  </div>
+                </div>
+
+                {/* Thumbnails */}
+                <div className="grid grid-cols-6 gap-2 sm:gap-3 mt-4">
+                  {IMAGES_BASE_MOVEL.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveImage(i)}
+                      className={`relative aspect-square rounded-xl overflow-hidden transition-all bg-slate-900 border ${
+                        activeImage === i
+                          ? "border-amber-400 opacity-100 scale-105 shadow-[0_0_15px_rgba(245,158,11,0.4)]"
+                          : "border-slate-800 opacity-60 hover:opacity-100"
+                      }`}
+                    >
+                      <img
+                        src={img}
+                        alt={`Vista ${i + 1}`}
+                        className="w-full h-full object-contain p-1"
+                        referrerPolicy="no-referrer"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </section>
+
+          {/* DORES / PROBLEMAS (BLOCO 2) */}
+          <section className="px-4 py-16 relative border-t border-slate-900 bg-slate-900/40">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-12">
+                <span className="text-rose-400 font-bold uppercase tracking-widest text-xs">O Problema Real Em Casa</span>
+                <h2 className="text-2xl sm:text-4xl font-black text-white mt-2 mb-4">
+                  Se o seu fogão, máquina de lavar ou geladeira já ficou "presa" no mesmo canto por meses...
+                </h2>
+                <p className="text-slate-400 max-w-2xl mx-auto text-sm sm:text-base">
+                  Mover eletrodomésticos pesados em Luanda costuma ser um pesadelo físico e desgastante. Veja se você identifica este cenário:
+                </p>
+              </div>
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  {
+                    icon: <TriangleAlert size={24} />,
+                    title: "Risco de Estragar o Eletrodoméstico",
+                    desc: "Arrastar o fogão, máquina ou geladeira à força entorta e parte os pés plásticos, amolga as laterais e pode estragar o equipamento de centenas de milhares de Kz.",
+                  },
+                  {
+                    icon: <Zap size={24} />,
+                    title: "Piso e Azulejos Destruídos",
+                    desc: "Empurrar equipamentos pesados no chão sem rodízios faz riscos profundos na cerâmica e arranca o acabamento dos azulejos da cozinha.",
+                  },
+                  {
+                    icon: <Users size={24} />,
+                    title: "Força Bruta e Dores nas Costas",
+                    desc: "Sempre que precisa deslocar o fogão ou a arca para limpar, precisa de 2 ou 3 pessoas fazendo força bruta com risco de lesões na coluna.",
+                  },
+                  {
+                    icon: <ShieldCheck size={24} />,
+                    title: "Sujeira Acumulada no Fundo",
+                    desc: "Com medo de estragar o fogão ou o piso ao arrastar, a sujeira, gordura e insetos acumulam-se no fundo sem nunca conseguir limpar.",
+                  },
+                ].map((item, i) => (
+                  <div key={i} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl hover:border-slate-700 transition-all flex flex-col">
+                    <div className="w-12 h-12 bg-rose-500/10 text-rose-400 rounded-xl flex items-center justify-center mb-5 border border-rose-500/20">
+                      {item.icon}
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
+                    <p className="text-slate-400 text-xs sm:text-sm leading-relaxed flex-grow">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* SOLUÇÃO (BLOCO 3) */}
+          <section className="px-4 py-16 relative bg-gradient-to-b from-slate-900/80 to-slate-950 border-y border-slate-900">
+            <div className="max-w-5xl mx-auto text-center">
+              <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">A Solução Definitiva</span>
+              <h2 className="text-3xl sm:text-5xl font-black text-white mt-2 mb-6">
+                Uma base, quatro rodízios, e o problema acaba.
+              </h2>
+              <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-3xl mx-auto mb-10">
+                A <strong>Base Móvel 360°</strong> encaixa perfeitamente debaixo de <strong>fogões, máquinas de lavar, geladeiras, frigoríficos, arcas congeladoras e móveis pesados</strong>. Basta posicionar o par de hastes metálicas e, a partir daí, o seu aparelho desliza suavemente com o toque de uma mão — permitindo mover para limpar por trás sem danificar o chão, sem riscar os azulejos e sem fazer força física.
+              </p>
+
+              <div className="p-1 rounded-3xl bg-gradient-to-r from-amber-500/30 via-orange-500/20 to-emerald-500/30">
+                <div className="bg-slate-900 p-8 sm:p-12 rounded-[22px] flex flex-col md:flex-row items-center justify-between gap-8 text-left">
+                  <div className="space-y-4 max-w-xl">
+                    <h3 className="text-2xl font-black text-white">Sem Ferramentas, Sem Complicação</h3>
+                    <p className="text-slate-300 text-sm leading-relaxed">
+                      Instalação direta no tipo piso. Ajuste a largura, coloque por baixo das patas do aparelho e trave as rodas. Pronto para deslizar com facilidade incomparável!
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleScrollToCheckout}
+                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-6 py-4 rounded-xl text-sm whitespace-nowrap transition-transform active:scale-95 shadow-lg shrink-0"
+                  >
+                    Garantir Reserva (15.000 Kz / Par)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ALERTA DE PROTEÇÃO DE PATRIMÔNIO: EVITE ESTRAGAR SEUS ELETRODOMÉSTICOS */}
+          <section className="px-4 py-16 relative bg-gradient-to-br from-rose-950/40 via-slate-900 to-amber-950/30 border-y border-rose-500/20 overflow-hidden">
+            <div className="max-w-6xl mx-auto relative z-10">
+              <div className="text-center mb-12">
+                <div className="inline-flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold px-4 py-1.5 rounded-full text-xs uppercase tracking-widest mb-4">
+                  <TriangleAlert size={16} />
+                  <span>Cuidado Com Prejuízos Desnecessários</span>
+                </div>
+                <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-white leading-tight">
+                  Dá Dó Ver Um Fogão ou Máquina de <span className="text-rose-400">200.000 Kz</span> Estragado Por Arrastar À Força!
+                </h2>
+                <p className="text-slate-300 max-w-3xl mx-auto text-sm sm:text-base mt-4 leading-relaxed">
+                  Quem tenta mover o fogão, máquina de lavar ou frigorífico sem rodízios adequados corre um risco enorme de <strong className="text-amber-400">partir os pés originais, entortar a chapa e rachar o piso de casa</strong>. Proteger o seu patrimônio custa apenas 15.000 Kz!
+                </p>
+              </div>
+
+              {/* Tabela Comparativa Visual */}
+              <div className="grid md:grid-cols-2 gap-8 items-stretch">
+                {/* Lado Errado / Com Risco */}
+                <div className="bg-slate-950/80 border border-rose-500/30 rounded-3xl p-6 sm:p-8 flex flex-col justify-between relative group hover:border-rose-500/60 transition-all">
+                  <div>
+                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-rose-500/20">
+                      <span className="text-xs font-black uppercase tracking-wider text-rose-400 bg-rose-500/10 px-3 py-1 rounded-full border border-rose-500/20">
+                        ❌ MOVER SEM BASE MÓVEL
+                      </span>
+                      <span className="text-xs text-rose-400 font-bold">Risco Alto de Danos</span>
+                    </div>
+
+                    <h3 className="text-xl font-black text-white mb-4">O Que Acontece ao Arrastar à Força:</h3>
+
+                    <ul className="space-y-4 text-xs sm:text-sm text-slate-300">
+                      <li className="flex items-start gap-3">
+                        <span className="text-rose-500 font-bold text-base shrink-0">✕</span>
+                        <span><strong>Pés e Patas de Apoio Partidos:</strong> A força lateral entorta ou quebra as roscas e suportes plásticos dos pés do fogão e da máquina.</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-rose-500 font-bold text-base shrink-0">✕</span>
+                        <span><strong>Piso e Azulejos Arruinados:</strong> O peso concentrado arranha a cerâmica, deixando sulcos e riscos profundos no chão da cozinha.</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-rose-500 font-bold text-base shrink-0">✕</span>
+                        <span><strong>Lataria e Conexões Amolgadas:</strong> Empurrar com o corpo amolga as chapas laterais e arrisca danificar tubos de gás, mangueiras ou fiação.</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-rose-500 font-bold text-base shrink-0">✕</span>
+                        <span><strong>Prejuízo Financeiro Alto:</strong> Substituir um pé partido ou reparar o piso custa muito mais caro do que a própria base.</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="mt-8 pt-4 border-t border-rose-500/20 text-center">
+                    <span className="text-xs font-bold text-rose-400 uppercase tracking-widest block">Resultado: Dor de cabeça e perda do bem</span>
+                  </div>
+                </div>
+
+                {/* Lado Certo / Com Proteção */}
+                <div className="bg-gradient-to-b from-amber-950/40 via-slate-900 to-slate-950 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 flex flex-col justify-between relative shadow-[0_0_30px_rgba(16,185,129,0.1)] hover:border-emerald-500 transition-all">
+                  <div>
+                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-emerald-500/20">
+                      <span className="text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                        ✓ COM A BASE MÓVEL 360°
+                      </span>
+                      <span className="text-xs text-emerald-400 font-bold">100% Protegido</span>
+                    </div>
+
+                    <h3 className="text-xl font-black text-white mb-4">A Garantia de Não Danificar Nada:</h3>
+
+                    <ul className="space-y-4 text-xs sm:text-sm text-slate-200">
+                      <li className="flex items-start gap-3">
+                        <span className="text-emerald-400 font-bold text-base shrink-0">✓</span>
+                        <span><strong>Proteção Total dos Pés Originais:</strong> As hastes acolhem o aparelho pela estrutura, sem colocar pressão nas patas frágeis.</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-emerald-400 font-bold text-base shrink-0">✓</span>
+                        <span><strong>Piso Intacto e Sem Riscos:</strong> Rodízios industriais de borracha reforçada deslizam suavemente sobre qualquer azulejo ou tijoleira.</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-emerald-400 font-bold text-base shrink-0">✓</span>
+                        <span><strong>Mantenha Seu Fogão Novo por Anos:</strong> Aumenta a durabilidade dos seus eletrodomésticos evitando umidade e impacto do chão.</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-emerald-400 font-bold text-base shrink-0">✓</span>
+                        <span><strong>Investimento Seguro de 15.000 Kz:</strong> Protege um patrimônio de 200.000 Kz ou mais por um valor simbólico de 1 par.</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="mt-8 pt-4 border-t border-emerald-500/20 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-emerald-400 block">✓ 1 Par Completo = 15.000 Kz</span>
+                      <span className="text-[11px] text-slate-400">Paga apenas na entrega em Luanda</span>
+                    </div>
+                    <button
+                      onClick={handleScrollToCheckout}
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-transform active:scale-95 shadow-md"
+                    >
+                      Reservar Agora
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* BENEFÍCIOS (BLOCO 4) */}
+          <section className="px-4 py-20 relative max-w-7xl mx-auto">
+            <div className="text-center mb-16">
+              <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">Por que esta base é superior</span>
+              <h2 className="text-3xl sm:text-4xl font-black text-white mt-2">
+                Diferenciais da Base Móvel 360°
+              </h2>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                {
+                  title: "Proteção Total Contra Danos",
+                  desc: "Evita que os pés do fogão ou máquina partam e protege o piso da sua cozinha contra riscos, trincas e marcas permanentes.",
+                  badge: "Zero Prejuízo",
+                },
+                {
+                  title: "Metal Reforçado Industrial",
+                  desc: "Construção ultra resistente fabricada para suportar o peso elevado de geladeiras de grande porte, arcas congeladoras e máquinas de lavar.",
+                  badge: "Alta Durabilidade",
+                },
+                {
+                  title: "Giro Duplo 360°",
+                  desc: "Rodízios duplos com giro fluido de 360 graus para movimentar eletrodomésticos para frente, para trás e para os lados com leveza.",
+                  badge: "Sem Esforço",
+                },
+                {
+                  title: "Design Ajustável e Flexível",
+                  desc: "Hastes telescópicas extensíveis (de 72 x 4 x 5,2 cm) que se adaptam perfeitamente à largura de fogões, máquinas e frigoríficos.",
+                  badge: "Universal",
+                },
+              ].map((b, i) => (
+                <div key={i} className="bg-slate-900 border border-slate-800 p-8 rounded-3xl relative flex flex-col justify-between hover:border-amber-500/40 transition-all group">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full border border-amber-500/20 inline-block mb-4">
+                      {b.badge}
+                    </span>
+                    <h3 className="text-xl font-bold text-white mb-3">{b.title}</h3>
+                    <p className="text-slate-400 text-sm leading-relaxed">{b.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ESPECIFICAÇÕES TÉCNICAS (BLOCO 5) */}
+          <section className="px-4 py-16 bg-slate-900/50 border-y border-slate-900">
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-12">
+                <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">Ficha do Fornecedor</span>
+                <h2 className="text-2xl sm:text-4xl font-black text-white mt-2">
+                  Especificações Técnicas Reais
+                </h2>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+                <div className="divide-y divide-slate-800 text-sm">
+                  {[
+                    { label: "Material", val: "Metal reforçado de alta resistência" },
+                    { label: "Dimensões", val: "72 × 4 × 5,2 cm (ajustável)" },
+                    { label: "Tipo de Rodízio", val: "Duplo, giro 360° com trava de segurança" },
+                    { label: "Instalação", val: "Tipo piso, sem necessidade de ferramentas" },
+                    { label: "Tolerância de Peso", val: "±1%" },
+                    { label: "Tolerância Dimensional", val: "±1mm" },
+                    { label: "Cor", val: "Preto acetinado industrial" },
+                    { label: "Design", val: "Ajustável, portátil, flexível" },
+                    { label: "Uso Indicado", val: "Máquinas de lavar, geladeiras, frigoríficos, arcas e móveis pesados" },
+                  ].map((row, i) => (
+                    <div key={i} className="p-4 sm:p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-2 hover:bg-slate-800/40 transition-colors">
+                      <span className="font-bold text-slate-400 text-xs sm:text-sm uppercase tracking-wider">{row.label}</span>
+                      <span className="font-semibold text-white text-sm sm:text-base">{row.val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* PROVA SOCIAL (BLOCO 6) */}
+          <section className="px-4 py-20 max-w-7xl mx-auto">
+            <div className="text-center mb-12">
+              <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">Aprovação em Luanda</span>
+              <h2 className="text-3xl sm:text-4xl font-black text-white mt-2">
+                Quem já resolveu o problema
+              </h2>
+            </div>
+
+            {/* Números Metricos */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12 max-w-4xl mx-auto text-center">
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <span className="text-3xl sm:text-4xl font-black text-amber-400 block">+1.240</span>
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1 block">Unidades Entregues em Luanda</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <span className="text-3xl sm:text-4xl font-black text-amber-400 block">98%</span>
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1 block">Satisfação das Famílias</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <span className="text-3xl sm:text-4xl font-black text-amber-400 block">100%</span>
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1 block">Pagamento Seguro na Entrega</span>
+              </div>
+            </div>
+
+            {/* Testemunhos */}
+            <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              {TESTIMONIALS_BASE_MOVEL.map((t, i) => (
+                <div key={i} className="bg-slate-900 border border-slate-800 p-8 rounded-3xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex gap-1 text-amber-400 mb-4">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star key={s} size={16} fill="currentColor" />
+                      ))}
+                    </div>
+                    <p className="text-slate-300 italic text-sm leading-relaxed mb-6">"{t.comment}"</p>
+                  </div>
+                  <div className="border-t border-slate-800 pt-4">
+                    <span className="font-bold text-white text-sm block">{t.name}</span>
+                    <span className="text-xs text-emerald-400 font-medium">✓ Cliente Verificado em Luanda</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ANCORAGEM DE PREÇO (BLOCO 7) */}
+          <section className="px-4 py-16 bg-gradient-to-b from-slate-950 to-slate-900 border-t border-slate-900">
+            <div className="max-w-4xl mx-auto bg-slate-900 border border-amber-500/30 p-8 sm:p-12 rounded-3xl text-center shadow-[0_0_50px_rgba(245,158,11,0.15)] relative overflow-hidden">
+              <span className="text-amber-400 font-black uppercase tracking-widest text-xs bg-amber-500/10 border border-amber-500/20 px-4 py-1.5 rounded-full inline-block mb-6">
+                Investimento Único Inteligente
+              </span>
+
+              <h2 className="text-2xl sm:text-4xl font-black text-white mb-6">
+                Menos do que custa contratar alguém para mover o aparelho uma única vez
+              </h2>
+
+              <div className="flex items-center justify-center gap-4 my-6 flex-wrap">
+                <span className="text-slate-500 line-through text-xl sm:text-2xl font-bold">30.000 Kz</span>
+                <span className="text-4xl sm:text-6xl font-black text-amber-400">15.000 Kz</span>
+                <span className="bg-amber-500 text-slate-950 font-black px-3 py-1 rounded-xl text-xs sm:text-sm uppercase shadow-md">
+                  Economize 15.000 Kz
+                </span>
+              </div>
+
+              <p className="text-slate-300 text-sm sm:text-base max-w-xl mx-auto mb-8">
+                Incluso: Entrega rápida em Luanda por estafeta próprio • Pagamento exclusivamente no ato da entrega (COD) • Suporte via WhatsApp.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button
+                  onClick={handleScrollToCheckout}
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-4 px-8 rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 text-base"
+                >
+                  <span>RESERVAR O MEU PAR AGORA (15.000 Kz)</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* GARANTIA (BLOCO 8) */}
+          <section className="px-4 py-12 max-w-4xl mx-auto">
+            <div className="bg-slate-900/60 border border-slate-800 p-8 rounded-3xl flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
+              <div className="w-16 h-16 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center shrink-0 border border-emerald-500/20">
+                <ShieldCheck size={36} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white mb-2">Garantia de Satisfação</h3>
+                <p className="text-slate-300 text-sm leading-relaxed">
+                  Se a base não encaixar corretamente no seu aparelho ou não atender às suas expectativas de transporte, você troca ou devolve no ato da entrega — sem complicações.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* URGÊNCIA E ESCASSEZ (BLOCO 9) */}
+          <section className="px-4 py-10 max-w-4xl mx-auto">
+            <div className="bg-amber-500/10 border border-amber-500/30 p-6 sm:p-8 rounded-2xl text-center backdrop-blur-md">
+              <p className="text-amber-300 text-sm sm:text-base font-bold leading-relaxed">
+                ⚠️ Restam poucas unidades neste lote ao preço de reserva. Novo lote só chega em algumas semanas — quem reserva hoje garante o preço promocional de 15.000 Kz e entrega esta semana em Luanda.
+              </p>
+            </div>
+          </section>
+
+          {/* FORMULÁRIO DE CHECKOUT (#comprar) & CTA FINAL */}
+          <section id="comprar" className="py-20 px-4 relative scroll-mt-6">
+            <div className="max-w-5xl mx-auto bg-slate-900 rounded-3xl border border-amber-500/30 overflow-hidden shadow-2xl flex flex-col-reverse md:flex-row">
+              
+              {/* Lado Esquerdo: Info Resumo */}
+              <div className="md:w-[45%] bg-gradient-to-b from-amber-950/60 via-slate-900 to-slate-900 p-8 sm:p-12 text-white flex flex-col justify-between">
+                <div>
+                  <span className="inline-block bg-rose-500 text-white font-black px-3 py-1 rounded-full text-[10px] tracking-widest uppercase mb-6 shadow-md animate-pulse">
+                    Stock Limitado
+                  </span>
+                  
+                  <h2 className="text-3xl sm:text-4xl font-black leading-tight mb-6">
+                    Chega de empurrar sozinho
+                  </h2>
+
+                  <p className="text-slate-300 text-sm leading-relaxed mb-8">
+                    Reserve agora a sua Base Móvel 360° por apenas <strong>15.000 Kz</strong> e resolva a limpeza e movimentação de aparelhos pesados ainda esta semana.
+                  </p>
+
+                  <div className="space-y-3 mb-8">
+                    {[
+                      "Sem pagamento antecipado (COD)",
+                      "Entrega rápida para Luanda",
+                      "Troca imediata garantida",
+                      "Atendimento dedicado no WhatsApp",
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3 text-xs sm:text-sm font-bold bg-slate-950/50 p-3 rounded-xl border border-slate-800">
+                        <CheckCircle size={16} className="text-amber-400 shrink-0" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-slate-800 flex items-center gap-2 text-xs text-amber-400 font-bold">
+                  <CheckCircle size={16} className="shrink-0" />
+                  <span>Preencha o formulário ao lado para validar a sua reserva</span>
+                </div>
+              </div>
+
+              {/* Lado Direito: Formulário */}
+              <div className="md:w-[55%] p-8 sm:p-12 bg-slate-950">
+                <div className="mb-8">
+                  <span className="text-amber-400 font-bold uppercase tracking-widest text-xs block mb-1">Formulário de Reserva</span>
+                  <h3 className="text-2xl font-black text-white">Confirme os seus dados</h3>
+                </div>
+
+                <form onSubmit={handleFormSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">Nome Completo</label>
+                    <input
+                      required
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none px-4 py-3.5 rounded-xl text-white placeholder:text-slate-600 font-medium transition-all text-sm"
+                      placeholder="Ex: Maria Santos"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">WhatsApp para Contacto</label>
+                    <input
+                      required
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none px-4 py-3.5 rounded-xl text-white placeholder:text-slate-600 font-medium transition-all text-sm"
+                      placeholder="Ex: 923 000 000"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">Província</label>
+                    <div className="relative">
+                      <select disabled className="w-full bg-slate-900 border border-slate-800 outline-none px-4 py-3.5 rounded-xl text-slate-400 appearance-none font-medium text-sm disabled:opacity-100">
+                        <option>Somente Luanda</option>
+                      </select>
+                      <Lock size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">Endereço (Bairro / Município / Ponto de Ref.)</label>
+                    <input
+                      required
+                      type="text"
+                      value={formData.area}
+                      onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none px-4 py-3.5 rounded-xl text-white placeholder:text-slate-600 font-medium transition-all text-sm"
+                      placeholder="Ex: Talatona, junto ao Kero"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">Observações (Opcional)</label>
+                    <textarea
+                      rows={2}
+                      value={formData.observacoes || ""}
+                      onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none px-4 py-3.5 rounded-xl text-white placeholder:text-slate-600 font-medium transition-all resize-none text-sm"
+                      placeholder="Informações para a entrega..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-1">
+                      Quantidade de Pares <span className="text-amber-400 font-normal lowercase">(1 Par = 2 bases inclusas)</span>
+                    </label>
+                    <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                      {[1, 2, 3, 4, 5].map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, quantity: q })}
+                          className={`py-3 border ${
+                            q === formData.quantity
+                              ? "bg-amber-500 border-amber-400 text-slate-950 font-black shadow-md scale-[1.02]"
+                              : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                          } rounded-xl transition-all text-xs sm:text-sm font-bold`}
+                        >
+                          {q} {q === 1 ? "Par" : "Pares"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className={`w-full py-4 rounded-xl font-black text-base flex flex-col items-center justify-center transition-all bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-[0_0_25px_rgba(245,158,11,0.3)] ${
+                        isSubmitting ? "opacity-70 cursor-wait" : "hover:-translate-y-0.5 active:scale-[0.98]"
+                      }`}
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="animate-spin" size={24} />
+                      ) : (
+                        <>
+                          <span>EFECTUAR MINHA RESERVA AGORA</span>
+                          <span className="text-[10px] uppercase tracking-widest mt-1 opacity-80">(Pagamento na Entrega: {formData.quantity * 15000} Kz)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+            </div>
+          </section>
+
+          {/* PERGUNTAS FREQUENTES (BLOCO 10) */}
+          <section className="px-4 py-16 max-w-3xl mx-auto">
+            <div className="text-center mb-12">
+              <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">Esclareça Suas Dúvidas</span>
+              <h2 className="text-3xl font-black text-white mt-2">Perguntas Frequentes</h2>
+            </div>
+            <div className="space-y-4">
+              {FAQ_BASE_MOVEL.map((item, i) => (
+                <AccordionItem key={i} question={item.q} answer={item.a} isDarkTheme />
+              ))}
+            </div>
+          </section>
+
+          {/* MOBILE STICKY BOTTOM BAR */}
+          {!isCheckoutVisible && (
+            <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 p-3 px-4 flex sm:hidden items-center justify-between shadow-2xl">
+              <div>
+                <span className="text-[10px] text-slate-400 line-through block leading-none">30.000 Kz</span>
+                <span className="text-lg font-black text-amber-400 leading-none">15.000 Kz</span>
+              </div>
+              <button
+                onClick={handleScrollToCheckout}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-lg active:scale-95 transition-transform"
+              >
+                <span>RESERVAR (15.000 Kz)</span>
+              </button>
+            </div>
+          )}
+
+        </main>
+      )}
+
+      {/* SALES PAGE: CINTA MODELADORA COLOMBIANA */}
+      {view === "sales-cinta-colombiana" && (
+        <CintaColombianaView
+          formData={formData}
+          setFormData={setFormData}
+          isSubmitting={isSubmitting}
+          onSubmit={handleFormSubmit}
+          isCheckoutVisible={isCheckoutVisible}
+          timeLeft={timeLeft}
+          formatTime={formatTime}
+          leadCount={getProductLeadCount("cinta-colombiana")}
+          leadGoal={productGoals["cinta-colombiana"] || 50}
+        />
+      )}
+
+      {/* SALES PAGE: CAMISA SEDA GELADA PREMIUM */}
+      {view === "sales-camisa-seda" && (
+        <CamisaSedaView
+          formData={formData}
+          setFormData={setFormData}
+          isSubmitting={isSubmitting}
+          onSubmit={handleFormSubmit}
+          isCheckoutVisible={isCheckoutVisible}
+          timeLeft={timeLeft}
+          formatTime={formatTime}
+          leadCount={getProductLeadCount("camisa-seda")}
+          leadGoal={productGoals["camisa-seda"] || 50}
+        />
+      )}
+
+      {/* SALES PAGE: VISOR AUTOMÓVEL ANTI-ENCANDEAMENTO 2 EM 1 */}
+      {view === "sales-visor-automovel" && (
+        <VisorAutomovelView
+          formData={formData}
+          setFormData={setFormData}
+          isSubmitting={isSubmitting}
+          onSubmit={handleFormSubmit}
+          isCheckoutVisible={isCheckoutVisible}
+          timeLeft={timeLeft}
+          formatTime={formatTime}
+          leadCount={getProductLeadCount("visor-automovel")}
+          leadGoal={productGoals["visor-automovel"] || 50}
+        />
+      )}
+
+      {/* FOOTER */}
+      {isSalesView && view !== "sales-cinta-colombiana" && view !== "sales-visor-automovel" && (
+        <footer className="bg-slate-900 text-slate-400 py-12 px-4 text-center mt-auto pb-28 md:pb-12 shadow-[inset_0_10px_30px_rgba(0,0,0,0.5)]">
+          <div className="max-w-4xl mx-auto flex flex-col items-center">
+            <img
+              src="https://i.postimg.cc/3wsKF20v/Chat-GPT-Image-13-de-mai-de-2026-12-40-58.png"
+              alt="Logotipo C Store Angola"
+              className="h-10 w-auto object-contain rounded opacity-80 hover:opacity-100 transition-opacity mb-5"
+            />
+            <h3 className="text-xl font-bold text-white mb-2 tracking-tight">
+              Procura por mais novidades?
+            </h3>
+            <p className="mb-6 max-w-sm mx-auto text-sm leading-relaxed text-slate-500">
+              Temos um catálogo completo com as últimas tendências e produtos
+              inovadores a preços incríveis.
+            </p>
+            <a
+              href="https://www.cstoreao.shop/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex justify-center items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-medium py-3 px-8 rounded-full border border-slate-700 transition hover:border-slate-500"
+            >
+              Visitar Loja Oficial C Store Angola
+            </a>
+
+            <div className="mt-10 flex justify-center">
+              <a
+                href="https://wa.me/244921167980?text=Olá,%20tenho%20dúvidas%20sobre%20o%20Secador%20Expresso%20Pro"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-emerald-500 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 hover:bg-emerald-600 transition-all font-bold text-sm"
+              >
+                <MessageCircle size={20} />
+                Tens dúvidas? Fala connosco via WhatsApp
+              </a>
+            </div>
+
+            <div className="mt-12 text-xs opacity-40">
+              &copy; {new Date().getFullYear()} C Store Angola. Todos os
+              direitos reservados.
+            </div>
+          </div>
+        </footer>
+      )}
+
+      {/* ADMIN VIEW */}
+      {view === "admin" && (
+        <main className="w-full max-w-none px-3 sm:px-6 lg:px-8 2xl:px-10 py-6 sm:py-8 flex-grow">
+          {adminSubView === "calculadora" ? (
+            <CardCalculatorView
+              isDark={isDark}
+              onBack={() => setAdminSubView("leads")}
+            />
+          ) : adminSubView === "prospeccao" ? (
+            <div className="animate-fadeIn">
+              <AdminSubNav
+                currentSubView={adminSubView}
+                onNavigateSubView={(subView) => setAdminSubView(subView)}
+                hidePhones={hidePhones}
+                onToggleHidePhones={() => setHidePhones(!hidePhones)}
+                onOpenExport={handleExportCSV}
+                leadsCount={adminData.length}
+              />
+              <AiProspectingView
+                isDark={isDark}
+                onImportLeadsToCrm={handleImportProspectLeads}
+                onTriggerWhatsApp={(lead, type) => {
+                  const cleanPhone = formatWhatsAppPhone(lead.phone);
+                  setWhatsAppModalData({
+                    isOpen: true,
+                    lead,
+                    type: "reserva",
+                    title: `Contacto Comercial — ${lead.name}`,
+                    messageText:
+                      lead.suggestedPitch ||
+                      `Olá ${lead.name}! Entramos em contacto da Valida C para apresentar soluções para o seu negócio.`,
+                    recipientPhone: cleanPhone,
+                    recipientName: lead.name,
+                  });
+                }}
+                formatPhoneWithCensorship={formatPhoneWithCensorship}
+              />
+            </div>
+          ) : adminSubView === "meta" ? (
+            <div className="animate-fadeIn">
+              <AdminSubNav
+                currentSubView={adminSubView}
+                onNavigateSubView={(subView) => setAdminSubView(subView)}
+                hidePhones={hidePhones}
+                onToggleHidePhones={() => setHidePhones(!hidePhones)}
+                onOpenExport={handleExportCSV}
+                leadsCount={adminData.length}
+              />
+              <MetaConnectionHub isDark={isDark} />
+            </div>
+          ) : (
+            <>
+              <div className="mb-6 block">
+                <button
+                  onClick={() => setView("pages")}
+                  className={`flex items-center gap-1.5 text-sm font-medium mb-4 transition-colors ${isDark ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-indigo-600"}`}
+                >
+                  <ArrowLeft size={16} /> Voltar
+                </button>
+                <AdminSubNav
+                  currentSubView={adminSubView}
+                  onNavigateSubView={(subView) => setAdminSubView(subView)}
+                  hidePhones={hidePhones}
+                  onToggleHidePhones={() => setHidePhones(!hidePhones)}
+                  onOpenExport={handleExportCSV}
+                  leadsCount={adminData.length}
+                />
+              </div>
+
+              {/* Modern CRM Pipeline & Qualification Funnel */}
+              <CrmPipelineView
+                isDark={isDark}
+                leads={adminData}
+                onUpdateStatus={updateLeadStatus}
+                onDeleteLead={(lead) => {
+                  setLeadToDelete(lead);
+                  setModalState("delete-lead-confirm");
+                }}
+                onOpenLeadDetail={(lead) => {
+                  setSelectedDrawerLead(lead);
+                  setIsDrawerOpen(true);
+                }}
+                onTriggerWhatsApp={(lead, type) => {
+                  const cleanPhone = formatWhatsAppPhone(lead.phone);
+                  const text =
+                    type === "entrega"
+                      ? getWhatsAppDeliveryText(lead)
+                      : type === "pendente"
+                        ? getWhatsAppPendingText(lead)
+                        : getWhatsAppReservationText(lead);
+                  setWhatsAppModalData({
+                    isOpen: true,
+                    lead,
+                    type,
+                    title:
+                      type === "entrega"
+                        ? "Confirmar Entrega"
+                        : type === "pendente"
+                          ? "Recuperar Lead Pendente"
+                          : "Confirmar Reserva",
+                    messageText: text,
+                    recipientPhone: cleanPhone,
+                    recipientName: lead.name || "Cliente",
+                  });
+                }}
+                formatKz={formatKz}
+                hidePhones={hidePhones}
+                formatPhoneWithCensorship={formatPhoneWithCensorship}
+                formatPageNameWithCensorship={formatPageNameWithCensorship}
+                availableProducts={crmAvailableProducts}
+                selectedProductFilter={crmProductFilter}
+                onSelectProductFilter={setCrmProductFilter}
+                onOpenExport={handleExportCSV}
+              />
+
+              {/* 360° Lead Qualification Drawer */}
+              <LeadDetailDrawer
+                lead={selectedDrawerLead}
+                isOpen={isDrawerOpen}
+                onClose={() => {
+                  setIsDrawerOpen(false);
+                  setSelectedDrawerLead(null);
+                }}
+                isDark={isDark}
+                onUpdateStatus={updateLeadStatus}
+                onDeleteLead={(lead) => {
+                  setLeadToDelete(lead);
+                  setModalState("delete-lead-confirm");
+                  setIsDrawerOpen(false);
+                }}
+                onTriggerWhatsApp={(lead, type) => {
+                  const cleanPhone = formatWhatsAppPhone(lead.phone);
+                  const text =
+                    type === "entrega"
+                      ? getWhatsAppDeliveryText(lead)
+                      : type === "pendente"
+                        ? getWhatsAppPendingText(lead)
+                        : getWhatsAppReservationText(lead);
+                  setWhatsAppModalData({
+                    isOpen: true,
+                    lead,
+                    type,
+                    title:
+                      type === "entrega"
+                        ? "Confirmar Entrega"
+                        : type === "pendente"
+                          ? "Recuperar Lead Pendente"
+                          : "Confirmar Reserva",
+                    messageText: text,
+                    recipientPhone: cleanPhone,
+                    recipientName: lead.name || "Cliente",
+                  });
+                }}
+                formatKz={formatKz}
+                hidePhones={hidePhones}
+                formatPhoneWithCensorship={formatPhoneWithCensorship}
+                formatPageNameWithCensorship={formatPageNameWithCensorship}
+              />
+            </>
+          )}
+        </main>
+      )}
+
+      {/* PAGES HUB VIEW */}
+      {view === "pages" && isAuthenticated && (
+        <main className="w-full max-w-none px-3 sm:px-6 lg:px-8 2xl:px-10 py-6 sm:py-8 flex-grow">
+          <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <button
+                onClick={() => setView("sales")}
+                className={`flex items-center gap-1.5 text-sm font-semibold mb-3 transition-colors cursor-pointer ${
+                  isDark ? "text-slate-400 hover:text-indigo-400" : "text-slate-500 hover:text-indigo-600"
+                }`}
+              >
+                <ArrowLeft size={16} /> Voltar
+              </button>
+              <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${
+                isDark ? "text-slate-100" : "text-slate-900"
+              }`}>
+                Gerência de Páginas
+              </h1>
+              <p className={`mt-1 text-sm ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}>
+                Gira as suas landing pages, acesse links e veja leads rapidamente.
+              </p>
+            </div>
+
+            {/* Tracking Button Trigger */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsTrackingModalOpen(true)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 shadow-sm hover:scale-[1.02] active:scale-[0.98] cursor-pointer border ${
+                  isDark
+                    ? "bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border-indigo-500/30"
+                    : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200/80"
+                }`}
+              >
+                <Sparkles size={17} className={isDark ? "text-indigo-400" : "text-indigo-600"} />
+                <span>Configurações de Tracking</span>
+                {(appSettings.fbPixel || appSettings.googleTag) && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" title="Pixel / Tag configurado" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Tracking Settings Modal */}
+          <AnimatePresence>
+            {isTrackingModalOpen && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm"
+                onClick={() => setIsTrackingModalOpen(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                  transition={{ type: "spring", duration: 0.3 }}
+                  className={`rounded-2xl shadow-2xl border max-w-lg w-full overflow-hidden ${
+                    isDark ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className={`p-6 border-b flex items-center justify-between ${
+                    isDark ? "bg-slate-800/60 border-slate-800" : "bg-slate-50/50 border-slate-100"
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold ${
+                        isDark ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-100 text-indigo-600"
+                      }`}>
+                        <Sparkles size={18} />
+                      </div>
+                      <div>
+                        <h3 className={`text-base sm:text-lg font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+                          Configurações Globais & Tracking
+                        </h3>
+                        <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                          WhatsApp de Pedidos, Meta Pixel e Google Tag
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsTrackingModalOpen(false)}
+                      className={`p-2 rounded-xl transition cursor-pointer ${
+                        isDark ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" : "text-slate-400 hover:text-slate-600 hover:bg-slate-200/60"
+                      }`}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-5">
+                    {/* WhatsApp Number Configuration */}
+                    <div className={`rounded-2xl p-4 border ${
+                      isDark ? "bg-emerald-950/30 border-emerald-800/50 text-emerald-200" : "bg-emerald-50/70 border-emerald-200/90 text-emerald-950"
+                    }`}>
+                      <label className="block text-xs font-bold uppercase tracking-wider mb-1.5 flex items-center gap-2">
+                        <MessageSquare size={15} className="text-emerald-400" />
+                        Número WhatsApp de Receção de Pedidos (Loja)
+                      </label>
+                      <input
+                        type="text"
+                        value={appSettings.whatsappOrderPhone || ""}
+                        onChange={(e) =>
+                          setAppSettings((prev) => ({
+                            ...prev,
+                            whatsappOrderPhone: e.target.value,
+                          }))
+                        }
+                        placeholder="Ex: 921167980"
+                        className={`w-full rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition border ${
+                          isDark
+                            ? "bg-slate-900 border-emerald-700/60 text-emerald-300 focus:ring-2 focus:ring-emerald-500"
+                            : "bg-white border-emerald-300 focus:border-emerald-500 text-slate-800 focus:ring-2 focus:ring-emerald-500"
+                        }`}
+                      />
+                      <p className={`mt-1.5 text-[11px] flex items-center gap-1 ${
+                        isDark ? "text-emerald-400/90" : "text-emerald-800"
+                      }`}>
+                        <Info size={13} className="shrink-0" /> Quando o cliente finalizar no WhatsApp, as mensagens irão diretamente para este número.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${
+                        isDark ? "text-slate-300" : "text-slate-700"
+                      }`}>
+                        Meta Pixel ID (Facebook)
+                      </label>
+                      <input
+                        type="text"
+                        value={appSettings.fbPixel || ""}
+                        onChange={(e) =>
+                          setAppSettings((prev) => ({
+                            ...prev,
+                            fbPixel: e.target.value,
+                          }))
+                        }
+                        placeholder="Ex: 4192962437607469"
+                        className={`w-full rounded-xl px-4 py-2.5 text-sm outline-none transition border ${
+                          isDark
+                            ? "bg-slate-950/60 border-slate-800 text-slate-200 focus:ring-2 focus:ring-indigo-500"
+                            : "bg-slate-50 border-slate-200 focus:bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                        }`}
+                      />
+                      <p className="mt-1 text-[11px] text-slate-400 flex items-center gap-1">
+                        <Info size={13} /> Cole apenas o número do ID do Pixel (ex: 4192962437607469).
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${
+                        isDark ? "text-slate-300" : "text-slate-700"
+                      }`}>
+                        Google Tag ID (Ads / Analytics)
+                      </label>
+                      <input
+                        type="text"
+                        value={appSettings.googleTag || ""}
+                        onChange={(e) =>
+                          setAppSettings((prev) => ({
+                            ...prev,
+                            googleTag: e.target.value,
+                          }))
+                        }
+                        placeholder="Ex: AW-123456789 ou G-XXXXX"
+                        className={`w-full rounded-xl px-4 py-2.5 text-sm outline-none transition border ${
+                          isDark
+                            ? "bg-slate-950/60 border-slate-800 text-slate-200 focus:ring-2 focus:ring-indigo-500"
+                            : "bg-slate-50 border-slate-200 focus:bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                        }`}
+                      />
+                      <p className="mt-1 text-[11px] text-slate-400 flex items-center gap-1">
+                        <Info size={13} /> Cole o ID de conversão do Google Ads ou Google Analytics.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={`p-4 border-t flex items-center justify-end gap-3 ${
+                    isDark ? "bg-slate-800/40 border-slate-800" : "bg-slate-50 border-slate-100"
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => setIsTrackingModalOpen(false)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        isDark ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-200/70"
+                      }`}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setIsSavingSettings(true);
+                        try {
+                          await setDoc(doc(db, "settings", "global"), appSettings);
+                          localStorage.setItem("validaC_app_settings", JSON.stringify(appSettings));
+                          setIsTrackingModalOpen(false);
+                          alert("Configurações salvas com sucesso!");
+                        } catch (err) {
+                          alert("Erro ao salvar configurações.");
+                        } finally {
+                          setIsSavingSettings(false);
+                        }
+                      }}
+                      disabled={isSavingSettings}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition shadow-md flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSavingSettings ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <CheckCircle size={15} />
+                      )}
+                      Salvar Configurações
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* PRODUCT VALIDATION ANALYTICS METRICS BAR */}
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+              <div>
+                <h2 className={`text-lg sm:text-xl font-bold flex items-center gap-2 ${
+                  isDark ? "text-slate-100" : "text-slate-900"
+                }`}>
+                  <Target size={20} className="text-indigo-400" /> Validation & Lead Goals Hub
+                </h2>
+                <p className={`text-xs sm:text-sm mt-0.5 ${
+                  isDark ? "text-slate-400" : "text-slate-500"
+                }`}>
+                  Acompanhe quais produtos atingiram a meta de reservas (validados) e edite os objetivos por página.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setPagesFilter("all")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    pagesFilter === "all"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : isDark
+                      ? "bg-slate-900/90 text-slate-300 hover:bg-slate-800 border border-slate-800"
+                      : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                  }`}
+                >
+                  Todos ({PRODUCTS_LIST.length})
+                </button>
+                <button
+                  onClick={() => setPagesFilter("active")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                    pagesFilter === "active"
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : isDark
+                      ? "bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50 border border-emerald-800/50"
+                      : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                  }`}
+                >
+                  🟢 Ativas ({PRODUCTS_LIST.filter((p) => activePagesStatus[p.id] !== false).length})
+                </button>
+                <button
+                  onClick={() => setPagesFilter("inactive")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                    pagesFilter === "inactive"
+                      ? "bg-rose-600 text-white shadow-sm"
+                      : isDark
+                      ? "bg-rose-950/40 text-rose-300 hover:bg-rose-900/50 border border-rose-800/50"
+                      : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
+                  }`}
+                >
+                  🔴 Desativadas ({PRODUCTS_LIST.filter((p) => activePagesStatus[p.id] === false).length})
+                </button>
+                <button
+                  onClick={() => setPagesFilter("validated")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                    pagesFilter === "validated"
+                      ? "bg-amber-600 text-white shadow-sm"
+                      : isDark
+                      ? "bg-amber-950/40 text-amber-300 hover:bg-amber-900/50 border border-amber-800/50"
+                      : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                  }`}
+                >
+                  🏆 Validados ({PRODUCTS_LIST.filter((p) => getProductValidationInfo(p.id).isValidated).length})
+                </button>
+                <button
+                  onClick={() => setPagesFilter("testing")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                    pagesFilter === "testing"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : isDark
+                      ? "bg-blue-950/40 text-blue-300 hover:bg-blue-900/50 border border-blue-800/50"
+                      : "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                  }`}
+                >
+                  🧪 Em Teste ({PRODUCTS_LIST.filter((p) => getProductValidationInfo(p.id).statusKey === "testing").length})
+                </button>
+                <button
+                  onClick={() => setPagesFilter("stock")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                    pagesFilter === "stock"
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : isDark
+                      ? "bg-purple-950/40 text-purple-300 hover:bg-purple-900/50 border border-purple-800/50"
+                      : "bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200"
+                  }`}
+                >
+                  📦 Em Stock ({PRODUCTS_LIST.filter((p) => getProductValidationInfo(p.id).isStockStage).length})
+                </button>
+              </div>
+            </div>
+
+            {/* Metric Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={`p-4 sm:p-5 rounded-2xl border transition flex items-center gap-4 ${
+                isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200 shadow-sm"
+              }`}>
+                <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${
+                  isDark ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : "bg-indigo-50 border-indigo-100 text-indigo-600"
+                }`}>
+                  <Store size={22} />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Páginas Ativas</span>
+                  <p className={`text-2xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+                    {PRODUCTS_LIST.filter((p) => activePagesStatus[p.id] !== false).length}
+                    <span className="text-xs font-normal text-slate-400 ml-1">/ {PRODUCTS_LIST.length}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className={`p-4 sm:p-5 rounded-2xl border transition flex items-center gap-4 ${
+                isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200 shadow-sm"
+              }`}>
+                <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${
+                  isDark ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-emerald-50 border-emerald-100 text-emerald-600"
+                }`}>
+                  <Award size={22} />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Validados</span>
+                  <p className="text-2xl font-black text-emerald-400">
+                    {PRODUCTS_LIST.filter((p) => getProductValidationInfo(p.id).isValidated).length}
+                    <span className="text-xs font-normal text-slate-400 ml-1">/ {PRODUCTS_LIST.length}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className={`p-4 sm:p-5 rounded-2xl border transition flex items-center gap-4 ${
+                isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200 shadow-sm"
+              }`}>
+                <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${
+                  isDark ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-amber-50 border-amber-100 text-amber-600"
+                }`}>
+                  <Timer size={22} />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Em Teste</span>
+                  <p className="text-2xl font-black text-amber-400">
+                    {PRODUCTS_LIST.filter((p) => getProductValidationInfo(p.id).statusKey === "testing").length}
+                  </p>
+                </div>
+              </div>
+
+              <div className={`p-4 sm:p-5 rounded-2xl border transition flex items-center gap-4 ${
+                isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200 shadow-sm"
+              }`}>
+                <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${
+                  isDark ? "bg-blue-500/10 border-blue-500/20 text-blue-400" : "bg-blue-50 border-blue-100 text-blue-600"
+                }`}>
+                  <PackageOpen size={22} />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Qtd. Reservada</span>
+                  <p className={`text-2xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+                    {PRODUCTS_LIST.reduce((sum, p) => sum + getProductValidationInfo(p.id).reservasCount, 0)}
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {PRODUCTS_LIST.reduce((sum, p) => sum + getProductValidationInfo(p.id).leadCount, 0)} leads no total
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* PRODUCT CARDS GRID */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {PRODUCTS_LIST.filter((prod) => {
+              const info = getProductValidationInfo(prod.id);
+              const isActive = activePagesStatus[prod.id] !== false;
+              if (pagesFilter === "active") return isActive;
+              if (pagesFilter === "inactive") return !isActive;
+              if (pagesFilter === "validated") return info.isValidated;
+              if (pagesFilter === "testing") return info.statusKey === "testing";
+              if (pagesFilter === "stock") return info.isStockStage;
+              return true;
+            }).map((prod) => {
+              const info = getProductValidationInfo(prod.id);
+              const isEditing = editingGoalProductId === prod.id;
+              const isActive = activePagesStatus[prod.id] !== false;
+
+              return (
+                <div
+                  key={prod.id}
+                  className={`rounded-2xl border overflow-hidden flex flex-col transition duration-200 ${
+                    isDark
+                      ? isActive
+                        ? info.isStockStage
+                          ? "bg-slate-900/90 border-blue-500/40 shadow-lg shadow-blue-950/20 ring-1 ring-blue-500/20"
+                          : "bg-slate-900/90 border-slate-800 hover:border-slate-700 shadow-sm"
+                        : "bg-slate-900/50 border-rose-900/40 opacity-80"
+                      : isActive
+                        ? info.isStockStage
+                          ? "bg-white border-blue-300 ring-1 ring-blue-200 shadow-sm"
+                          : "bg-white border-slate-200 shadow-sm"
+                        : "bg-slate-50/70 border-rose-200/80 opacity-90 shadow-sm"
+                  }`}
+                >
+                  <div className="aspect-video bg-slate-800 relative group overflow-hidden">
+                    <img
+                      src={prod.image}
+                      alt={prod.title}
+                      onError={(e) => {
+                        // Fallback image if remote host fails
+                        (e.currentTarget as HTMLImageElement).src =
+                          "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80";
+                      }}
+                      className={`w-full h-full object-cover transition-transform group-hover:scale-105 ${
+                        isActive ? "" : "grayscale-[40%]"
+                      }`}
+                    />
+                    {/* Validation Overlay Badge */}
+                    <div
+                      className={`absolute top-3 left-3 text-[10px] uppercase font-black px-2.5 py-1 rounded-full shadow-md backdrop-blur-md border ${
+                        info.isInactive
+                          ? "bg-rose-600/90 text-white border-rose-400"
+                          : info.isStockStage
+                          ? "bg-blue-600/90 text-white border-blue-400"
+                          : info.isValidated
+                          ? "bg-emerald-600/90 text-white border-emerald-400"
+                          : info.reservasCount > 0
+                          ? "bg-amber-500/90 text-slate-950 border-amber-300 font-extrabold"
+                          : "bg-slate-700/90 text-white border-slate-500"
+                      }`}
+                    >
+                      {info.badgeText}
+                    </div>
+
+                    {/* Interactive Activate/Deactivate Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePageStatus(prod.id);
+                      }}
+                      className={`absolute top-3 right-3 text-[10px] font-black px-2.5 py-1 rounded-full shadow-md uppercase transition-all duration-200 flex items-center gap-1.5 border backdrop-blur-md cursor-pointer ${
+                        isActive
+                          ? "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-400 shadow-emerald-500/30 hover:scale-105 active:scale-95"
+                          : "bg-rose-500 hover:bg-rose-600 text-white border-rose-400 shadow-rose-500/30 hover:scale-105 active:scale-95"
+                      }`}
+                      title={isActive ? "Clique para desativar esta página" : "Clique para ativar esta página"}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-white animate-pulse" : "bg-white/80"}`} />
+                      {isActive ? "Ativa" : "Desativada"}
+                    </button>
+                  </div>
+
+                  <div className="p-5 flex-grow flex flex-col justify-between">
+                    <div>
+                      <h3 className={`font-bold text-base sm:text-lg mb-1 leading-tight ${
+                        isDark ? "text-slate-100" : "text-slate-900"
+                      }`}>
+                        {prod.title}
+                      </h3>
+                      <p className={`text-xs mb-4 line-clamp-2 ${
+                        isDark ? "text-slate-400" : "text-slate-500"
+                      }`}>
+                        {prod.subtitle}
+                      </p>
+
+                      {/* VALIDATION PROGRESS SECTION */}
+                      <div className={`p-3.5 rounded-xl mb-4 border ${
+                        isDark ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"
+                      }`}>
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <span className={`font-bold flex items-center gap-1.5 ${
+                            isDark ? "text-slate-300" : "text-slate-700"
+                          }`}>
+                            <Target size={13} className="text-indigo-400" /> Qtd. Reservada:
+                          </span>
+                          <span className={`font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+                            {info.reservasCount} / {info.goal} un. ({Math.min(100, info.percent)}%)
+                          </span>
+                        </div>
+
+                        {/* Animated Progress Bar */}
+                        <div className={`w-full h-2 rounded-full overflow-hidden mb-2.5 ${
+                          isDark ? "bg-slate-800" : "bg-slate-200"
+                        }`}>
+                          <div
+                            className={`h-full transition-all duration-500 rounded-full ${
+                              info.isValidated
+                                ? "bg-emerald-500"
+                                : info.reservasCount > 0
+                                ? "bg-gradient-to-r from-amber-500 to-yellow-400"
+                                : "bg-slate-600"
+                            }`}
+                            style={{ width: `${Math.min(100, info.percent)}%` }}
+                          />
+                        </div>
+
+                        {/* Goal Edit Controls */}
+                        {isEditing ? (
+                          <div className={`flex items-center gap-1.5 pt-1.5 border-t mt-2 ${
+                            isDark ? "border-slate-800" : "border-slate-200"
+                          }`}>
+                            <input
+                              type="number"
+                              min="1"
+                              value={tempGoalInput}
+                              onChange={(e) => setTempGoalInput(parseInt(e.target.value) || 1)}
+                              className={`w-16 rounded-lg px-2 py-1 text-xs font-bold outline-none border ${
+                                isDark
+                                  ? "bg-slate-900 border-slate-700 text-slate-100 focus:ring-2 focus:ring-indigo-500"
+                                  : "bg-white border-slate-300 text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                              }`}
+                            />
+                            <button
+                              onClick={() => updateProductGoal(prod.id, tempGoalInput)}
+                              className="bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold transition cursor-pointer"
+                            >
+                              Salvar
+                            </button>
+                            <button
+                              onClick={() => setEditingGoalProductId(null)}
+                              className={`text-[11px] px-2 py-1 rounded-lg font-bold cursor-pointer ${
+                                isDark ? "bg-slate-800 text-slate-300 hover:bg-slate-700" : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                              }`}
+                            >
+                              X
+                            </button>
+                          </div>
+                        ) : (
+                          <div className={`flex items-center justify-between text-[11px] pt-1.5 border-t ${
+                            isDark ? "text-slate-400 border-slate-800/80" : "text-slate-500 border-slate-200/70"
+                          }`}>
+                            <span>Meta: <strong className={isDark ? "text-slate-200 font-bold" : "text-slate-800 font-bold"}>{info.goal} Unidades</strong></span>
+                            <button
+                              onClick={() => {
+                                setEditingGoalProductId(prod.id);
+                                setTempGoalInput(info.goal);
+                              }}
+                              className={`font-bold flex items-center gap-1 transition cursor-pointer ${
+                                isDark ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-800"
+                              }`}
+                            >
+                              <Edit size={11} /> Alterar Meta
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Evolution / Stage Selector */}
+                    <div className={`pt-2.5 pb-2 border-t flex items-center justify-between ${
+                      isDark ? "border-slate-800" : "border-slate-100"
+                    }`}>
+                      <span className={`text-[11px] font-bold flex items-center gap-1 ${
+                        isDark ? "text-slate-400" : "text-slate-500"
+                      }`}>
+                        Estágio: <strong className={info.isStockStage ? "text-blue-400 font-black" : "text-amber-400 font-black"}>{info.isStockStage ? "📦 Stock / Imediato" : "🧪 Teste / Reserva"}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleProductStage(prod.id)}
+                        className={`text-[11px] font-black px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1 cursor-pointer shadow-xs ${
+                          info.isStockStage
+                            ? isDark
+                              ? "bg-blue-950/50 hover:bg-blue-900/60 text-blue-300 border-blue-800/60"
+                              : "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                            : "bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-blue-500/20"
+                        }`}
+                        title={info.isStockStage ? "Clique para voltar a modo Validação/Reserva" : "Clique para promover para Encomendas em Stock (Entrega Imediata)"}
+                      >
+                        <Sparkles size={11} />
+                        {info.isStockStage ? "Voltar a Teste" : "Mover p/ Stock"}
+                      </button>
+                    </div>
+
+                    <div className={`flex flex-wrap gap-2 pt-2.5 border-t ${
+                      isDark ? "border-slate-800" : "border-slate-100"
+                    }`}>
+                      <button
+                        onClick={() => setView(prod.viewName)}
+                        className="flex-1 text-xs sm:text-sm bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-xl font-bold transition flex justify-center items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <Eye size={14} /> Pré-visualizar
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterProduct(prod.title);
+                          setView("admin");
+                        }}
+                        className={`text-xs sm:text-sm px-3 py-2 rounded-xl font-bold transition border shadow-sm cursor-pointer ${
+                          isDark
+                            ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                        }`}
+                        title={`${info.leadCount} leads recebidos no total`}
+                      >
+                        Ver Leads ({info.leadCount})
+                      </button>
+                      <button
+                        onClick={() => togglePageStatus(prod.id)}
+                        className={`text-xs px-3 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 shrink-0 border shadow-sm cursor-pointer ${
+                          isActive
+                            ? isDark
+                              ? "bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border-rose-800/60"
+                              : "bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200"
+                            : isDark
+                              ? "bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border-emerald-800/60"
+                              : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200"
+                        }`}
+                        title={isActive ? "Clique para desativar esta página" : "Clique para ativar esta página"}
+                      >
+                        <Power size={13} />
+                        {isActive ? "Desativar" : "Ativar"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const link =
+                            window.location.origin + "?product=" + prod.paramName;
+                          navigator.clipboard.writeText(link);
+                          alert("Link copiado: " + link);
+                        }}
+                        className={`text-sm px-3 py-2 rounded-xl font-bold transition flex items-center justify-center shrink-0 w-[38px] border shadow-sm cursor-pointer ${
+                          isDark
+                            ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"
+                            : "bg-white hover:bg-slate-50 border-slate-200 text-slate-600"
+                        }`}
+                        title="Copiar Link da Página"
+                      >
+                        <Copy size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </main>
+      )}
+
+      {/* USERS VIEW */}
+      {view === "users" && isAuthenticated && (
+        <UsersView
+          onBack={() => setView("pages")}
+          currentUserEmail={auth.currentUser?.email || null}
+        />
+      )}
+
+      {/* DANGER ZONE VIEW */}
+      {view === "danger-zone" && isAuthenticated && (
+        <main className="w-full max-w-[1600px] mx-auto px-4 py-10 flex-grow">
+          <div className="mb-8 block">
+            <button
+              onClick={() => setView("pages")}
+              className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 font-medium mb-4 transition-colors"
+            >
+              <ArrowLeft size={16} /> Voltar
+            </button>
+            <h1 className="text-3xl font-bold text-red-600 flex items-center gap-3">
+              <AlertOctagon size={32} /> Zona de Perigo
+            </h1>
+            <p className="text-slate-500 mt-1">
+              Ações avançadas e irreversíveis sobre a plataforma.
+            </p>
+          </div>
+
+          <div className="max-w-2xl bg-white border border-red-200 rounded-2xl shadow-sm overflow-hidden mt-6">
+            <div className="p-6 border-b border-red-100 bg-red-50/50">
+              <h2 className="font-bold text-red-800 text-lg">Atenção!</h2>
+              <p className="text-sm text-red-700 mt-1">
+                As funcionalidades abaixo excluem permanentemente os dados. Use
+                com extrema cautela.
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="pb-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h3 className="font-bold text-slate-800">
+                    Eliminar Leads por Páginas
+                  </h3>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    Apaga todos os leads de uma página selecionada.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setDangerInputValue("");
+                    setModalState("danger-action-page-prompt");
+                  }}
+                  className="whitespace-nowrap px-4 py-2 bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 text-red-700 rounded-xl transition-colors font-medium text-sm flex items-center gap-2"
+                >
+                  <Trash2 size={16} /> Especial
+                </button>
+              </div>
+
+              <div className="pb-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h3 className="font-bold text-slate-800">Eliminar Páginas</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    Remove a página e todos os leads associados a ela.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setDangerActionContext({
+                      alertMessage:
+                        "As páginas são estáticas nesta versão do sistema. Para alterar as visualizações de páginas, deverá editar o código diretamente.",
+                    });
+                    setModalState("danger-alert");
+                  }}
+                  className="whitespace-nowrap px-4 py-2 bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 text-red-700 rounded-xl transition-colors font-medium text-sm flex items-center gap-2"
+                >
+                  <Trash2 size={16} /> Páginas
+                </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h3 className="font-bold text-slate-800">Eliminação Total</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    Remove TODOS os leads de TODAS as campanhas da plataforma.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setDangerInputValue("");
+                    setModalState("danger-action-all-prompt");
+                  }}
+                  className="whitespace-nowrap px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-sm transition-colors font-bold text-sm flex items-center gap-2"
+                >
+                  <Trash2 size={16} /> Tudo!
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      )}
+      <AnimatePresence>
+        {modalState !== "none" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex justify-center items-center p-4 overflow-y-auto cursor-pointer"
+            onClick={() => {
+              if (modalState === "lead-preview") {
+                setSelectedLeadForPreview(null);
+              }
+              setModalState("none");
+            }}
+          >
+            {/* Step 1: Confirmation of Customer Data & Order Details */}
+            {modalState === "step1" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8 border border-slate-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="bg-gradient-to-r from-indigo-600 to-blue-700 p-6 text-center text-white relative">
+                  <button
+                    onClick={() => closeModal()}
+                    className="absolute top-4 right-4 text-indigo-200 hover:text-white p-1 rounded-full hover:bg-white/10 transition"
+                  >
+                    <XCircle size={24} />
+                  </button>
+                  <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-sm border border-white/20 shadow-inner">
+                    <User className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-black tracking-tight">
+                    📋 Confirme os seus Dados
+                  </h3>
+                  <p className="text-xs text-indigo-100 mt-1 font-semibold">
+                    Por favor, verifique as informações antes de prosseguir
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-5 text-slate-700 text-sm">
+                  {/* Dados do Cliente */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-slate-900 border-b border-slate-200/80 pb-2 text-xs uppercase tracking-wider text-indigo-600">
+                      <User size={15} />
+                      <span>Seus Dados de Contacto & Entrega</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1.5 text-xs sm:text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-medium">Nome:</span>
+                        <span className="font-bold text-slate-800">{formData.name || "Não informado"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-medium">WhatsApp / Telefone:</span>
+                        <span className="font-bold text-slate-800">{formData.phone || "Não informado"}</span>
+                      </div>
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-slate-500 font-medium shrink-0">Endereço de Entrega:</span>
+                        <span className="font-bold text-slate-800 text-right">
+                          {formData.area ? `${formData.area}, ` : ""}{formData.province === "Outra" ? formData.customProvince : formData.province}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resumo do Pedido */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-slate-900 border-b border-slate-200/80 pb-2 text-xs uppercase tracking-wider text-indigo-600">
+                      <ShoppingBag size={15} />
+                      <span>{view === "sales-roupas" ? "Detalhes do Pedido" : "Detalhes da Reserva"}</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs sm:text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-medium">Produto:</span>
+                        <span className="font-bold text-slate-900">
+                          {view === "sales-visor-automovel"
+                            ? "Visor Automóvel Anti-Encandeamento 2 em 1"
+                            : view === "sales-cinta-colombiana"
+                              ? "Cinta Modeladora Colombiana"
+                              : view === "sales-roupas"
+                                ? "Secador Expresso Pro"
+                                : view === "sales-roteador"
+                                  ? "ZTE 5G Ultra WiFi"
+                                  : view === "sales-base-movel"
+                                    ? "Base Móvel 360°"
+                                    : view === "sales-camisa-seda"
+                                      ? "Camisa de Seda Gelada Premium"
+                                      : "Secador UV"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-medium">Quantidade:</span>
+                        <span className="font-bold text-slate-800">{formData.quantity}x Unidade(s)</span>
+                      </div>
+                      {view === "sales-roupas" && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Data de Entrega:</span>
+                            <span className="font-bold text-slate-800">
+                              {formData.deliveryDate
+                                ? formData.deliveryDate.split("-").reverse().join("/")
+                                : "A agendar"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Período:</span>
+                            <span className="font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200 text-xs">
+                              {formData.deliveryPeriod || "Manhã (08:00 às 12:00)"}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                      {(lastSubmittedLead?.color || lastSubmittedLead?.size) && (
+                        <>
+                          {lastSubmittedLead?.color && (
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 font-medium">Cor(es):</span>
+                              <span className="font-bold text-slate-800">{lastSubmittedLead.color}</span>
+                            </div>
+                          )}
+                          {lastSubmittedLead?.size && (
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 font-medium">Tamanho(s):</span>
+                              <span className="font-bold text-slate-800">{lastSubmittedLead.size}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-200/80 mt-2">
+                        <span className="text-slate-700 font-bold">Total a pagar na entrega:</span>
+                        <span className="font-black text-emerald-600 text-base sm:text-lg">
+                          {new Intl.NumberFormat("pt-AO").format(
+                            lastSubmittedLead?.totalPrice || (
+                              view === "sales-visor-automovel"
+                                ? (formData.quantity === 1 ? 17000 : formData.quantity === 2 ? 30000 : formData.quantity === 3 ? 44000 : formData.quantity * 17000)
+                                : view === "sales-camisa-seda"
+                                  ? (formData.quantity === 1 ? 35000 : formData.quantity === 2 ? 60000 : formData.quantity === 3 ? 86000 : formData.quantity === 5 ? 140000 : 35000)
+                                  : view === "sales-cinta-colombiana"
+                                    ? (formData.quantity === 1 ? 45000 : formData.quantity === 2 ? 80000 : formData.quantity === 3 ? 110000 : 45000)
+                                    : 35000
+                            )
+                          )} Kz
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Botões de Ação da Etapa 1 */}
+                  <div className="space-y-2.5 pt-2">
+                    <button
+                      onClick={() => {
+                        if (view === "sales-roupas") {
+                          processReservation(true);
+                        } else {
+                          setModalState("step2");
+                        }
+                      }}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-4 rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98] text-sm flex justify-center items-center gap-2"
+                    >
+                      <CheckCircle size={20} />
+                      CONFIRMAR DADOS DO PEDIDO
+                    </button>
+                    <button
+                      onClick={() => {
+                        setModalState("none");
+                        const formElem = document.getElementById("reserva") || document.getElementById("comprar");
+                        if (formElem) formElem.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl transition-all active:scale-[0.98] text-xs flex justify-center items-center gap-1.5 border border-slate-200"
+                    >
+                      <Pencil size={15} />
+                      {view === "sales-roupas" ? "EDITAR DADOS DO PEDIDO" : "EDITAR DETALHES DA RESERVA"}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 2: Sold-Out Reposition Notice & Decision */}
+            {modalState === "step2" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8 border border-slate-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="bg-gradient-to-r from-red-600 to-rose-700 p-6 text-center text-white relative">
+                  <button
+                    onClick={() => closeModal()}
+                    className="absolute top-4 right-4 text-rose-200 hover:text-white p-1 rounded-full hover:bg-white/10 transition"
+                  >
+                    <XCircle size={24} />
+                  </button>
+                  <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-sm border border-white/20 shadow-inner">
+                    <Timer className="w-8 h-8 text-white animate-pulse" />
+                  </div>
+                  <h3 className="text-2xl font-black tracking-tight">
+                    🔴 Lote Esgotado em Luanda
+                  </h3>
+                  <p className="text-xs text-rose-100 mt-1 font-semibold">
+                    Mas não se preocupe! Novo lote chega em breve.
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-5 text-slate-700 text-sm">
+                  {/* Mensagem Principal */}
+                  <div className="bg-rose-50 border border-rose-200/90 rounded-2xl p-4 text-xs sm:text-sm text-rose-950 space-y-2">
+                    <div className="flex items-center gap-2 font-black text-rose-900 text-sm">
+                      <Timer size={18} className="text-rose-600 shrink-0" />
+                      <span>Reposição & Entrega Garantida:</span>
+                    </div>
+                    <p className="leading-relaxed text-slate-700">
+                      {view === "sales-base-movel" ? (
+                        <>
+                          A sua reserva foi registada e o produto será reposto em breve e entregue no seu endereço assim que o próximo lote chegar em Angola.
+                        </>
+                      ) : (
+                        <>
+                          O lote de entrega imediata esgotou. A sua reserva foi registada e o produto será reposto e entregue no seu endereço dentro de <strong>14 dias</strong> após a confirmação.
+                        </>
+                      )}
+                    </p>
+                    <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 p-2 rounded-xl border border-emerald-200">
+                      💡 Pagamento 100% Seguro entrega
+                    </p>
+                  </div>
+
+                  {/* Decisão */}
+                  <div className="space-y-3 pt-2">
+                    <button
+                      onClick={() => processReservation(true)}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-4 rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98] text-sm flex justify-center items-center gap-2"
+                    >
+                      <CheckCircle size={20} />
+                      SIM, QUERO GARANTIR A MINHA PROMOÇÃO ✅
+                    </button>
+                    <button
+                      onClick={() => setModalState("last-chance")}
+                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3.5 px-4 rounded-xl transition-all active:scale-[0.98] text-xs flex justify-center items-center gap-1.5 border border-slate-200"
+                    >
+                      PREFIRO CONTINUAR SEM O PRODUTO ❌
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 2: Last Chance */}
+            {modalState === "last-chance" && (
+               <motion.div
+                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                 animate={{ scale: 1, opacity: 1, y: 0 }}
+                 className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8 border-4 border-red-50"
+                 onClick={(e) => e.stopPropagation()}
+               >
+                 <div className="bg-red-50 text-center pt-8 pb-4">
+                   <TriangleAlert className="w-16 h-16 mx-auto mb-2 text-red-500" />
+                   <h3 className="text-2xl font-black text-slate-900">
+                     Tens a certeza,{" "}
+                     {formData.name ? formData.name.split(" ")[0] : "amigo"}?
+                   </h3>
+                 </div>
+                 <div className="p-8 text-center pt-4">
+                   <p className="text-slate-700 mb-6 font-bold text-lg">
+                     Sem o{" "}
+                     {view === "sales-visor-automovel"
+                       ? "Visor Automóvel 2 em 1"
+                       : view === "sales-cinta-colombiana"
+                       ? "Cinta Modeladora Colombiana"
+                       : view === "sales-roupas"
+                         ? "Secador Expresso Pro"
+                         : view === "sales-roteador"
+                           ? "Roteador 5G Ultra"
+                           : view === "sales-base-movel"
+                             ? "Base Móvel 360°"
+                             : view === "sales-camisa-seda"
+                               ? "Camisa de Seda Gelada"
+                               : "Secador UV"}
+                     , vais continuar a:
+                   </p>
+                   {view === "sales-cinta-colombiana" ? (
+                     <ul className="text-left text-slate-600 mb-8 space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">💃</span>{" "}
+                         <span className="font-medium">
+                           Esconder a barriga e evitar usar aquelas roupas que tanto gostas
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🧍‍♀️</span>{" "}
+                         <span className="font-medium">
+                           Sofrer com má postura e dores na coluna durante o dia
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">😓</span>{" "}
+                         <span className="font-medium">
+                           Usar cintas desconfortáveis que enrolam e marcam debaixo da roupa
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">💸</span>{" "}
+                         <span className="font-medium">
+                           Perder a oportunidade do lote promocional de pré-venda em Luanda
+                         </span>
+                       </li>
+                     </ul>
+                   ) : view === "sales-roteador" ? (
+                     <ul className="text-left text-slate-600 mb-8 space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🛜</span>{" "}
+                         <span className="font-medium">
+                           Depender de provedores com sinal fraco
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🐢</span>{" "}
+                         <span className="font-medium">
+                           Ficar com internet super lenta quando muita gente conecta
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">💸</span>{" "}
+                         <span className="font-medium">
+                           Gastar num plano de internet caro e limitado
+                         </span>
+                       </li>
+                     </ul>
+                   ) : view === "sales-base-movel" ? (
+                     <ul className="text-left text-slate-600 mb-8 space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🏋️</span>{" "}
+                         <span className="font-medium">
+                           Precisar de 2 ou 3 pessoas só para deslocar o fogão, geladeira ou máquina
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🪳</span>{" "}
+                         <span className="font-medium">
+                           Acumular poeira, mofo e insetos atrás dos eletrodomésticos sem conseguir limpar
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">⚡</span>{" "}
+                         <span className="font-medium">
+                           Riscar e danificar o piso ao empurrar equipamentos pesados com dores nas costas
+                         </span>
+                       </li>
+                     </ul>
+                   ) : view === "sales-roupas" ? (
+                     <ul className="text-left text-slate-600 mb-8 space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🩲</span>{" "}
+                         <span className="font-medium">
+                           Ter vergonha de deixar roupa íntima no estendal comum dos vizinhos
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🤢</span>{" "}
+                         <span className="font-medium">
+                           Suportar o cheiro a bafio e fungos nas roupas
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">😤</span>{" "}
+                         <span className="font-medium">
+                           Ver camisas, calças e uniformes escolares húmidos de manhã
+                         </span>
+                       </li>
+                     </ul>
+                   ) : view === "sales-camisa-seda" ? (
+                     <ul className="text-left text-slate-600 mb-8 space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🥵</span>{" "}
+                         <span className="font-medium">
+                           Sofrer com o calor sufocante e camisas que colam ao corpo com suor
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">👕</span>{" "}
+                         <span className="font-medium">
+                           Andar com camisas amarrotadas ou com caimento desajustado
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🌬️</span>{" "}
+                         <span className="font-medium">
+                           Ficar sem a sensação térmica de frescura extrema do tecido Seda Gelada
+                         </span>
+                       </li>
+                     </ul>
+                   ) : (
+                     <ul className="text-left text-slate-600 mb-8 space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">👟</span>{" "}
+                         <span className="font-medium">
+                           Ter vergonha de tirar os sapatos em público pelo mau cheiro
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">🤢</span>{" "}
+                         <span className="font-medium">
+                           Acumular fungos e bactérias dentro do calçado favorito
+                         </span>
+                       </li>
+                       <li className="flex items-start gap-3">
+                         <span className="text-xl">😤</span>{" "}
+                         <span className="font-medium">
+                           Usar ténis e sapatos húmidos que magoam os pés
+                         </span>
+                       </li>
+                     </ul>
+                   )}
+
+                   {/* Pergunta Q2 do Fluxograma */}
+                   <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 mb-6 text-slate-900 font-bold text-sm">
+                     {view === "sales-cinta-colombiana"
+                       ? "Você prefere ter a cintura fina e postura elegante ou continuar a esconder a barriga?"
+                       : view === "sales-camisa-seda"
+                         ? "Você prefere elegância e frescura extrema no calor ou continuar a suar e colar a camisa ao corpo?"
+                         : view === "sales-roupas"
+                           ? "Você prefere roupas secas e cheirosas em 2 horas ou continuar a suportar o cheiro a bafio?"
+                           : view === "sales-roteador"
+                             ? "Você prefere internet 5G ultra-rápida sem travamento ou continuar a passar raiva com sinal caindo?"
+                             : view === "sales-base-movel"
+                               ? "Você prefere mover móveis e limpar com 1 dedo ou continuar com dores nas costas e chão riscado?"
+                               : "Você prefere calçados limpos e sem chulé ou continuar com o mau cheiro ao tirar os sapatos?"}
+                   </div>
+
+                   <div className="space-y-3">
+                     <button
+                       onClick={() => processReservation(true)}
+                       className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-4 rounded-xl shadow-lg transition-transform active:scale-[0.98]"
+                     >
+                       ✅ MUDEI DE IDEIAS! QUERO RESERVAR
+                     </button>
+                     <button
+                       onClick={() => setModalState("testimonial-rebound")}
+                       className="w-full bg-transparent text-slate-400 hover:text-slate-600 underline font-medium py-2 transition"
+                     >
+                       Sim, assumo o risco e perco a promoção
+                     </button>
+                   </div>
+                 </div>
+               </motion.div>
+            )}
+
+            {/* Step 3: Testimonial Rebound */}
+            {modalState === "testimonial-rebound" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-indigo-600 p-8 text-center text-white">
+                  <Sparkles className="w-16 h-16 mx-auto mb-4 text-indigo-200" />
+                  <h3 className="text-2xl font-black tracking-tight">
+                    Última oportunidade,{" "}
+                    {formData.name ? formData.name.split(" ")[0] : "amigo"}
+                  </h3>
+                </div>
+                <div className="p-8 text-center">
+                  <p className="text-slate-700 mb-8 font-bold leading-relaxed">
+                    Antes de saíres, só uma coisa:
+                  </p>
+
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8 text-left relative">
+                    <div className="absolute -top-3 -left-2 bg-indigo-500 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-widest shadow-sm">
+                      Testemunho Real
+                    </div>
+                    <p className="text-slate-600 italic mb-4 leading-relaxed">
+                      "
+                      {view === "sales-roupas"
+                        ? "A Maria de Talatona também hesitou. Hoje agradece todos os dias por ter reservado. Nunca pensei que ia fazer tanta diferença. A minha roupa íntima seca em 2 horas dentro do quarto. Sem vergonha, sem bafio."
+                        : view === "sales-roteador"
+                          ? "O Mário de Talatona também hesitou. Hoje agradece por ter mudado para este roteador 5G libertando-se de internet que caía toda a hora, agora desfruta de 3600Mbps mesmo no pico."
+                          : view === "sales-base-movel"
+                            ? "A Dona Rosa do Kilamba também hesitou. Hoje consegue arrastar a geladeira e a máquina de lavar sozinha só com uma mão para limpar. Sem pedir ajuda e sem riscar o chão."
+                            : view === "sales-camisa-seda"
+                              ? "O Ricardo de Luanda também hesitou. Hoje agradece todos os dias por ter reservado. O tecido de Seda Gelada é super fresco e não precisa de passar a ferro. Sinto-me super elegante e muito confortável o dia inteiro."
+                              : view === "sales-cinta-colombiana"
+                                ? "A Ana do Kilamba também hesitou. Hoje agradece todos os dias por ter reservado. A Cinta Colombiana modela a cintura na hora e dá uma postura incrível sem magoar nem enrolar na roupa!"
+                                : "O Paulo do Kilamba também hesitou. Hoje agradece todos os dias por ter reservado. O mau cheiro dos ténis de treino desapareceu completamente. Sinto os pés muito mais saudáveis e frescos."}
+                      "
+                    </p>
+                    <div className="flex items-center gap-1 text-amber-400">
+                      <Star size={16} fill="currentColor" />
+                      <Star size={16} fill="currentColor" />
+                      <Star size={16} fill="currentColor" />
+                      <Star size={16} fill="currentColor" />
+                      <Star size={16} fill="currentColor" />
+                    </div>
+                  </div>
+
+                  <p className="text-indigo-600 font-bold mb-8 text-base">
+                    A reserva é gratuita e sem compromisso. Pagas só quando
+                    receberes.
+                  </p>
+
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => processReservation(true)}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-4 rounded-xl shadow-lg transition-transform active:scale-[0.98]"
+                    >
+                      ✅ OK, VOU RESERVAR
+                    </button>
+                    <button
+                      onClick={() => processReservation(false)}
+                      className="w-full bg-transparent text-slate-300 hover:text-slate-500 underline font-medium py-2 transition text-sm"
+                    >
+                      Não, desisto mesmo.
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 4: Success */}
+            {modalState === "success" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-emerald-500 p-8 text-center text-white">
+                  <CheckCircle className="w-16 h-16 mx-auto mb-4 text-emerald-100" />
+                  <h3 className="text-3xl font-black tracking-tight">
+                    {view === "sales-roupas" ? "🎉 Pedido Registado!" : "🎉 Reserva Garantida!"}
+                  </h3>
+                </div>
+                <div className="p-8 text-center text-slate-700">
+                  <p className="text-xl font-bold mb-4">
+                     Parabéns,{" "}
+                     <span className="text-indigo-600">
+                       {formData.name ? formData.name.split(" ")[0] : "Cliente"}
+                     </span>
+                     !
+                  </p>
+
+                  {view === "sales-roupas" ? (
+                    <div className="space-y-4 mb-6">
+                      <p className="text-slate-700 font-bold text-base leading-relaxed">
+                        O seu pedido foi registrado com sucesso e entregaremos na data agendada.
+                      </p>
+
+                      <div className="bg-emerald-50/80 text-slate-800 p-5 rounded-2xl text-sm border border-emerald-200 text-left space-y-3 shadow-sm">
+                        <div className="flex items-center gap-2 font-black text-emerald-950 text-sm border-b border-emerald-200 pb-2">
+                          <CheckCircle size={17} className="text-emerald-600 shrink-0" />
+                          <span>Resumo da Entrega Agendada</span>
+                        </div>
+                        <div className="space-y-2 text-xs sm:text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Produto:</span>
+                            <span className="font-bold text-slate-900">Secador Expresso Pro</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Quantidade:</span>
+                            <span className="font-bold text-slate-900">{formData.quantity}x Unidade(s)</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Data Agendada:</span>
+                            <span className="font-bold text-slate-900">
+                              {formData.deliveryDate
+                                ? formData.deliveryDate.split("-").reverse().join("/")
+                                : "A agendar"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-medium">Período:</span>
+                            <span className="font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md text-xs">
+                              {formData.deliveryPeriod || "Manhã (08:00 às 12:00)"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-slate-500 font-medium shrink-0">Local:</span>
+                            <span className="font-bold text-slate-800 text-right">
+                              {formData.area ? `${formData.area}, ` : ""}{formData.province === "Outra" ? formData.customProvince : formData.province}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center pt-2 border-t border-emerald-200 font-bold">
+                            <span className="text-slate-700">Total a pagar:</span>
+                            <span className="font-black text-emerald-700 text-base">
+                              {new Intl.NumberFormat("pt-AO").format(formData.quantity * 35000)} Kz
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/60 p-2 rounded-xl text-center">
+                          💡 Pagamento 100% seguro em mãos no ato da entrega.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-slate-600 mb-6 leading-relaxed">
+                      A tua unidade de{" "}
+                      <strong>
+                        {view === "sales-visor-automovel"
+                          ? `Combo ${formData.quantity}x Visor Automóvel 2 em 1`
+                          : view === "sales-cinta-colombiana"
+                            ? `Combo ${formData.quantity}x Cinta Modeladora Colombiana`
+                            : view === "sales-roteador"
+                              ? "ZTE 5G Ultra"
+                              : view === "sales-base-movel"
+                                ? (formData.quantity > 1 ? `Combo ${formData.quantity}x Base Móvel 360°` : "Base Móvel 360°")
+                                : view === "sales-camisa-seda"
+                                  ? `Combo ${formData.quantity}x Camisa de Seda Gelada`
+                                  : "Secador UV"}
+                      </strong>{" "}
+                      está reservada ao preço de{" "}
+                      <strong>
+                        {view === "sales-visor-automovel"
+                          ? (formData.quantity === 1 ? "17.000 Kz" : formData.quantity === 2 ? "30.000 Kz" : formData.quantity === 3 ? "44.000 Kz" : `${new Intl.NumberFormat("pt-AO").format(formData.quantity * 17000)} Kz`)
+                          : view === "sales-cinta-colombiana"
+                            ? (formData.quantity === 1 ? "45.000 Kz" : formData.quantity === 2 ? "80.000 Kz" : formData.quantity === 3 ? "110.000 Kz" : "45.000 Kz")
+                            : view === "sales-roteador"
+                              ? "240.000 Kz"
+                              : view === "sales-base-movel"
+                                ? `${new Intl.NumberFormat("pt-AO").format(formData.quantity * 15000)} Kz`
+                                : view === "sales-camisa-seda"
+                                  ? (formData.quantity === 1 ? "35.000 Kz" : formData.quantity === 2 ? "60.000 Kz" : formData.quantity === 3 ? "86.000 Kz" : formData.quantity === 5 ? "140.000 Kz" : "35.000 Kz")
+                                  : "25.000 Kz"}
+                      </strong>
+                      .
+                    </p>
+                  )}
+
+                  {view === "sales-visor-automovel" ? (
+                    <div className="bg-emerald-50 text-emerald-900 p-5 rounded-2xl text-sm mb-8 border border-emerald-200 text-left space-y-2.5 shadow-sm">
+                      <div className="flex items-center gap-2 font-black text-emerald-950 text-base">
+                        <Timer size={20} className="text-emerald-600 shrink-0" />
+                        <span>Reserva Registada com Sucesso</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed font-medium">
+                        A sua reserva de <strong>Visor Automóvel Anti-Encandeamento 2 em 1</strong> foi registada com sucesso! A nossa equipa entrará em contacto via WhatsApp/ligação para confirmar o endereço e os detalhes de entrega.
+                      </p>
+                      <p className="text-xs text-emerald-700 font-semibold pt-2 border-t border-emerald-200/80">
+                        Pagas com segurança apenas no momento em que receberes o visor em mãos.
+                      </p>
+                    </div>
+                  ) : view === "sales-cinta-colombiana" ? (
+                    <div className="bg-emerald-50 text-emerald-900 p-5 rounded-2xl text-sm mb-8 border border-emerald-200 text-left space-y-2.5 shadow-sm">
+                      <div className="flex items-center gap-2 font-black text-emerald-950 text-base">
+                        <Timer size={20} className="text-emerald-600 shrink-0" />
+                        <span>Prazo de Lançamento & Entrega</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed font-medium">
+                        A sua reserva de <strong>Cinta Modeladora Colombiana</strong> foi registrada com sucesso! A entrega será efetuada dentro de <strong>14 dias</strong>.
+                      </p>
+                      <p className="text-xs text-amber-900 bg-amber-50/90 border border-amber-200/80 p-2.5 rounded-xl font-medium">
+                        ⚠️ <strong>Observação:</strong> Certifique-se de ter escolhido o tamanho correto para a sua cinta.
+                      </p>
+                      <p className="text-xs text-emerald-700 font-semibold pt-2 border-t border-emerald-200/80">
+                        Receberás uma mensagem no WhatsApp quando o lote chegar — pagas só no momento da entrega em mãos.
+                      </p>
+                    </div>
+                  ) : view === "sales-camisa-seda" ? (
+                    <div className="bg-emerald-50 text-emerald-900 p-5 rounded-2xl text-sm mb-8 border border-emerald-200 text-left space-y-2.5 shadow-sm">
+                      <div className="flex items-center gap-2 font-black text-emerald-950 text-base">
+                        <Timer size={20} className="text-emerald-600 shrink-0" />
+                        <span>Prazo de Reposição & Entrega (Camisa de Seda)</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed font-medium">
+                        O estoque será reposto dentro de <strong>14 dias</strong>. Após confirmar a encomenda, vai receber o seu pedido dentro de <strong>14 dias</strong>!
+                      </p>
+                      <p className="text-xs text-amber-900 bg-amber-50/90 border border-amber-200/80 p-2.5 rounded-xl font-medium">
+                        ⚠️ <strong>Observação:</strong> Certifique-se de ter escolhido o tamanho e a cor corretos para a sua camisa.
+                      </p>
+                      <p className="text-xs text-emerald-700 font-semibold pt-2 border-t border-emerald-200/80">
+                        Receberás uma mensagem no WhatsApp quando o lote chegar — pagas só no momento da entrega.
+                      </p>
+                    </div>
+                  ) : view === "sales-roupas" ? null : (
+                    <div className="bg-emerald-50 text-emerald-900 p-5 rounded-2xl text-sm mb-8 border border-emerald-200 text-left space-y-2.5 shadow-sm">
+                      <div className="flex items-center gap-2 font-black text-emerald-950 text-base">
+                        <Timer size={20} className="text-emerald-600 shrink-0" />
+                        <span>Prazo de Reposição & Entrega</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed font-medium">
+                        A sua reserva foi registrada com sucesso! A entrega será realizada em poucos dias úteis após o envio do lote.
+                      </p>
+                      <p className="text-xs text-emerald-700 font-semibold pt-2 border-t border-emerald-200/80">
+                        Receberás uma mensagem no WhatsApp quando o lote chegar — pagas só no momento da entrega.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-slate-100">
+                    {view === "sales-roupas" ? (
+                      <div className="space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => sendOrderToWhatsApp()}
+                          className="w-full flex justify-center items-center gap-3 bg-[#25D366] hover:bg-[#128C7E] text-white font-black py-4 px-4 rounded-2xl transition-all transform active:scale-[0.98] shadow-xl shadow-emerald-500/25 cursor-pointer text-base"
+                        >
+                          <MessageCircle size={24} />
+                          <span>FINALIZAR NO WHATSAPP</span>
+                        </button>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Clique no botão acima para enviar os detalhes da sua entrega diretamente para o nosso atendimento.
+                        </p>
+                        <a
+                          href="https://www.cstoreao.shop/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full flex justify-center items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 px-4 rounded-xl transition-all active:scale-[0.98] border border-slate-200 text-xs"
+                        >
+                          <Store size={18} />
+                          Visitar Loja Oficial C Store Angola
+                        </a>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
+                          Enquanto esperas, partilha com um amigo 👇
+                        </p>
+                        <a
+                          href={
+                            view === "sales-camisa-seda"
+                              ? `https://wa.me/?text=Olha%20esta%20camisa%20de%20seda%20gelada%20que%20acabei%20de%20reservar!%20%0A%0A${window.location.href}`
+                              : `https://wa.me/?text=Olha%20este%20secador%20que%20acabei%20de%20reservar!%20%0A%0A${window.location.href}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full flex justify-center items-center gap-3 bg-[#25D366] hover:bg-[#128C7E] text-white font-black py-4 px-4 rounded-xl transition-transform active:scale-[0.98] shadow-lg shadow-emerald-500/20 mb-3"
+                        >
+                          <MessageCircle size={22} />
+                          <span>PARTILHAR NO WHATSAPP</span>
+                        </a>
+                        <a
+                          href="https://www.cstoreao.shop/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full flex justify-center items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-4 px-4 rounded-xl transition-transform active:scale-[0.98] border border-slate-200"
+                        >
+                          <Store size={20} />
+                          Visitar Loja C Store Angola
+                        </a>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 3 Alt: Rejected */}
+            {modalState === "rejected" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white max-w-sm w-full rounded-3xl shadow-2xl overflow-hidden my-8 p-8 text-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <XCircle className="w-8 h-8 text-slate-400" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-3">
+                  Compreendemos.
+                </h3>
+                <p className="text-slate-500 mb-8 leading-relaxed">
+                  A sua vaga foi libertada para o próximo cliente na lista de
+                  espera.
+                </p>
+                <div className="space-y-3">
+                  <a
+                    href="https://www.cstoreao.shop/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex justify-center items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-xl transition-transform active:scale-[0.98]"
+                  >
+                    CONHECER OUTROS PRODUTOS
+                  </a>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Profile Edit Modal */}
+            {modalState === "profile" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-slate-900 p-6 text-center text-white relative">
+                  <button
+                    onClick={() => setModalState("none")}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white"
+                  >
+                    <XCircle size={24} />
+                  </button>
+                  <div className="w-16 h-16 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-2xl shadow-inner mx-auto mb-3">
+                    {(auth.currentUser?.displayName || "Pedro")
+                      .charAt(0)
+                      .toUpperCase()}
+                  </div>
+                  <h3 className="text-xl font-bold">Meu Perfil</h3>
+                </div>
+
+                <div className="p-8">
+                  <form onSubmit={handleUpdateProfile} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Nome
+                      </label>
+                      <input
+                        type="text"
+                        value={profileFormData.name}
+                        onChange={(e) =>
+                          setProfileFormData({
+                            ...profileFormData,
+                            name: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={profileFormData.email}
+                        onChange={(e) =>
+                          setProfileFormData({
+                            ...profileFormData,
+                            email: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Nova Senha (opcional)
+                      </label>
+                      <input
+                        type="password"
+                        value={profileFormData.password}
+                        onChange={(e) =>
+                          setProfileFormData({
+                            ...profileFormData,
+                            password: e.target.value,
+                          })
+                        }
+                        placeholder="Deixe em branco para manter a atual"
+                        className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all transform active:scale-[0.98] mt-4"
+                    >
+                      Guardar Alterações
+                    </button>
+                  </form>
+
+                  <div className="mt-8 pt-6 border-t border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalState("danger-zone");
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors border border-red-100 font-bold"
+                    >
+                      <AlertOctagon size={18} /> Acessar Zona de Perigo
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Danger Zone Entry Modal */}
+            {modalState === "danger-zone" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8 border-2 border-red-500/20"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-red-50 p-6 text-center text-red-900 relative border-b border-red-100">
+                  <button
+                    onClick={() => setModalState("none")}
+                    className="absolute top-4 right-4 text-red-400 hover:text-red-600 border border-transparent hover:border-red-600 rounded-full"
+                  >
+                    <XCircle size={24} />
+                  </button>
+                  <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center text-red-600 mx-auto mb-3">
+                    <AlertOctagon size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold flex items-center justify-center gap-2">
+                    Aviso de Segurança
+                  </h3>
+                  <p className="text-sm mt-2 text-red-700/80 font-medium">
+                    Você está preste a acessar uma área restrita e perigosa.
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-4 text-center">
+                  <p className="text-slate-600 text-sm">
+                    A Zona de Perigo permite a{" "}
+                    <strong className="text-red-600">
+                      exclusão irreversível
+                    </strong>{" "}
+                    de páginas e contatos. Qualquer ação realizada lá não poderá
+                    ser desfeita. Tem a certeza que pretende continuar?
+                  </p>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => setModalState("none")}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 rounded-xl font-medium transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setModalState("none");
+                        setView("danger-zone");
+                      }}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-bold transition-colors shadow-sm"
+                    >
+                      Sim, tenho a certeza
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Danger Custom Modals */}
+            {modalState === "danger-action-page-prompt" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-red-50 p-6 border-b border-red-100 relative">
+                  <button
+                    onClick={() => setModalState("none")}
+                    className="absolute top-4 right-4 text-red-400 hover:text-red-700"
+                  >
+                    <XCircle size={24} />
+                  </button>
+                  <h3 className="text-lg font-bold text-red-900 mb-1">
+                    Eliminar Leads por Página
+                  </h3>
+                  <p className="text-sm text-red-700/80">
+                    Digite o NOME DA PÁGINA (ex: "Secador Inteligente UV")
+                  </p>
+                </div>
+                <div className="p-6">
+                  <input
+                    type="text"
+                    value={dangerInputValue}
+                    onChange={(e) => setDangerInputValue(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none mb-6"
+                    placeholder="Nome da página..."
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setModalState("none")}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-medium transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold shadow-sm transition"
+                      onClick={async () => {
+                        if (!dangerInputValue) return;
+                        try {
+                          const q = query(
+                            collection(db, "leads"),
+                            where("produto", "==", dangerInputValue),
+                          );
+                          const snapshot = await getDocs(q);
+                          if (snapshot.empty) {
+                            setDangerActionContext({
+                              alertMessage:
+                                "Nenhum lead encontrado para esta página.",
+                            });
+                            setModalState("danger-alert");
+                            return;
+                          }
+                          setDangerActionContext({
+                            pageName: dangerInputValue,
+                            leadCount: snapshot.size,
+                            docsToDelete: snapshot.docs,
+                          });
+                          setModalState("danger-action-page-confirm");
+                        } catch (err) {
+                          handleFirestoreError(
+                            err,
+                            OperationType.DELETE,
+                            "leads",
+                          );
+                        }
+                      }}
+                    >
+                      Procurar
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {modalState === "danger-action-page-confirm" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-red-600 p-6 text-center text-white relative">
+                  <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center mx-auto mb-3">
+                    <AlertOctagon size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold flex items-center justify-center gap-2">
+                    Confirma a eliminação?
+                  </h3>
+                </div>
+                <div className="p-6 text-center">
+                  <p className="text-slate-600 mb-6">
+                    Foram encontrados{" "}
+                    <strong className="text-red-600">
+                      {dangerActionContext.leadCount}
+                    </strong>{" "}
+                    leads para a página "{dangerActionContext.pageName}". A
+                    eliminação é definitiva.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setModalState("none")}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-medium transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold shadow-sm transition"
+                      onClick={async () => {
+                        try {
+                          const docs = dangerActionContext.docsToDelete || [];
+                          await Promise.all(
+                            docs.map((docSnapshot) =>
+                              deleteDoc(doc(db, "leads", docSnapshot.id)),
+                            ),
+                          );
+                          setDangerActionContext({
+                            alertMessage: `${docs.length} leads eliminados com sucesso.`,
+                          });
+                          setModalState("danger-alert");
+                          if (isAuthenticated) loadAdminData();
+                        } catch (err) {
+                          handleFirestoreError(
+                            err,
+                            OperationType.DELETE,
+                            "leads",
+                          );
+                        }
+                      }}
+                    >
+                      Sim, eliminar
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {modalState === "danger-action-all-prompt" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-red-50 p-6 border-b border-red-100 relative">
+                  <button
+                    onClick={() => setModalState("none")}
+                    className="absolute top-4 right-4 text-red-500"
+                  >
+                    <XCircle size={24} />
+                  </button>
+                  <h3 className="text-lg font-bold text-red-900 mb-1">
+                    Eliminação Total
+                  </h3>
+                  <p className="text-sm text-red-700 flex flex-col gap-1">
+                    Para confirmar a exclusão DEFINITIVA de todos os leads,
+                    digite:{" "}
+                    <strong className="bg-red-100 px-2 py-1 rounded inline-block text-center mt-2 font-mono">
+                      eliminar todos leads
+                    </strong>
+                  </p>
+                </div>
+                <div className="p-6">
+                  <input
+                    type="text"
+                    value={dangerInputValue}
+                    onChange={(e) => setDangerInputValue(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none mb-6 text-center font-mono"
+                    placeholder="Escreva aqui..."
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setModalState("none")}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-medium transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold shadow-sm transition"
+                      onClick={async () => {
+                        if (dangerInputValue !== "eliminar todos leads") {
+                          setDangerActionContext({
+                            alertMessage: "Nome de verificação incorreto.",
+                          });
+                          setModalState("danger-alert");
+                          return;
+                        }
+                        try {
+                          const snapshot = await getDocs(
+                            collection(db, "leads"),
+                          );
+                          if (snapshot.empty) {
+                            setDangerActionContext({
+                              alertMessage:
+                                "Nenhum lead encontrado para apagar.",
+                            });
+                            setModalState("danger-alert");
+                            return;
+                          }
+                          await Promise.all(
+                            snapshot.docs.map((docSnapshot) =>
+                              deleteDoc(doc(db, "leads", docSnapshot.id)),
+                            ),
+                          );
+                          setDangerActionContext({
+                            alertMessage: `Total de ${snapshot.size} leads eliminados com sucesso.`,
+                          });
+                          setModalState("danger-alert");
+                          if (isAuthenticated) loadAdminData();
+                        } catch (err) {
+                          handleFirestoreError(
+                            err,
+                            OperationType.DELETE,
+                            "leads",
+                          );
+                        }
+                      }}
+                    >
+                      Confirmar Exclusão
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {modalState === "danger-alert" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white max-w-sm w-full rounded-3xl shadow-2xl overflow-hidden my-8 p-6 text-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600">
+                  <Info size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-3">
+                  Informação
+                </h3>
+                <p className="text-slate-600 mb-6">
+                  {dangerActionContext.alertMessage}
+                </p>
+                <button
+                  onClick={() => setModalState("none")}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-sm"
+                >
+                  Entendido
+                </button>
+              </motion.div>
+            )}
+
+            {modalState === "delete-lead-confirm" && leadToDelete && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white max-w-sm w-full rounded-3xl shadow-2xl overflow-hidden my-8 p-6 text-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
+                  <Trash2 size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                  Excluir Lead permanentemente?
+                </h3>
+                <p className="text-sm text-slate-500 mb-6 font-medium">
+                  Esta ação não pode ser desfeita. O lead de{" "}
+                  <span className="font-bold text-slate-700">
+                    {leadToDelete.name}
+                  </span>{" "}
+                  será removido para sempre.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    disabled={isDeletingLead}
+                    onClick={() => {
+                      if (!isDeletingLead) {
+                        setLeadToDelete(null);
+                        setModalState("none");
+                      }
+                    }}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 font-bold py-3 px-4 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Não, manter
+                  </button>
+                  <button
+                    disabled={isDeletingLead}
+                    onClick={async () => {
+                      setIsDeletingLead(true);
+                      try {
+                        await deleteDoc(doc(db, "leads", leadToDelete.id));
+                        if (view === "admin") {
+                          setAdminData((prev) =>
+                            prev.filter((l) => l.id !== leadToDelete.id),
+                          );
+                        }
+                        setSelectedLeadIds((prev) =>
+                          prev.filter((id) => id !== leadToDelete.id),
+                        );
+                        setModalState("none");
+                        setLeadToDelete(null);
+                      } catch (e) {
+                        handleFirestoreError(e, OperationType.DELETE, "leads");
+                      } finally {
+                        setIsDeletingLead(false);
+                      }
+                    }}
+                    className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-75 text-white font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isDeletingLead ? (
+                      <>
+                        <Loader2 className="animate-spin" size={18} />
+                        <span>A processar...</span>
+                      </>
+                    ) : (
+                      <span>Sim, excluir</span>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {modalState === "delete-bulk-confirm" && selectedLeadIds.length > 0 && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white max-w-sm w-full rounded-3xl shadow-2xl overflow-hidden my-8 p-6 text-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
+                  <Trash2 size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                  Eliminar {selectedLeadIds.length} lead(s) em grupo?
+                </h3>
+                <p className="text-sm text-slate-500 mb-6 font-medium">
+                  Esta ação é permanente e irreversível. Os{" "}
+                  <span className="font-bold text-slate-700">
+                    {selectedLeadIds.length}
+                  </span>{" "}
+                  leads selecionados serão eliminados permanentemente.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    disabled={isDeletingBulk}
+                    onClick={() => {
+                      if (!isDeletingBulk) {
+                        setModalState("none");
+                      }
+                    }}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 font-bold py-3 px-4 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    disabled={isDeletingBulk}
+                    onClick={async () => {
+                      setIsDeletingBulk(true);
+                      try {
+                        await Promise.all(
+                          selectedLeadIds.map((id) =>
+                            deleteDoc(doc(db, "leads", id)),
+                          ),
+                        );
+                        if (view === "admin") {
+                          setAdminData((prev) =>
+                            prev.filter((l) => !selectedLeadIds.includes(l.id)),
+                          );
+                        }
+                        setSelectedLeadIds([]);
+                        setModalState("none");
+                      } catch (e) {
+                        handleFirestoreError(e, OperationType.DELETE, "leads");
+                      } finally {
+                        setIsDeletingBulk(false);
+                      }
+                    }}
+                    className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-75 text-white font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isDeletingBulk ? (
+                      <>
+                        <Loader2 className="animate-spin" size={18} />
+                        <span>A processar...</span>
+                      </>
+                    ) : (
+                      <span>Sim, eliminar</span>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {modalState === "lead-preview" && selectedLeadForPreview && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white max-w-md w-full rounded-3xl shadow-2xl overflow-hidden my-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-indigo-600 p-6 text-white text-center relative">
+                  <button
+                    onClick={() => {
+                      setSelectedLeadForPreview(null);
+                      setModalState("none");
+                    }}
+                    className="absolute top-4 right-4 text-white/80 hover:text-white"
+                  >
+                    <XCircle size={24} />
+                  </button>
+                  <Eye className="w-12 h-12 mx-auto mb-3 animate-pulse" />
+                  <h3 className="text-xl font-bold">Detalhes do Lead</h3>
+                  <p className="text-indigo-200 text-xs mt-1">
+                    Previsualização Completa do Pedido
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div className="space-y-3 text-sm text-slate-700">
+                    <div>
+                      <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        Data de Reserva
+                      </span>
+                      <p className="font-semibold">
+                        {selectedLeadForPreview.timestamp
+                          ? new Date(
+                              selectedLeadForPreview.timestamp,
+                            ).toLocaleString()
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        Nome Completo
+                      </span>
+                      <p className="font-semibold text-slate-900">
+                        {selectedLeadForPreview.name}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        Segmento / Produto
+                      </span>
+                      <p className="font-semibold text-slate-900">
+                        {formatPageNameWithCensorship(
+                          selectedLeadForPreview.produto ||
+                            "Secador Inteligente UV",
+                        )}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
+                          WhatsApp
+                        </span>
+                        <p className="font-semibold text-slate-900">
+                          {formatPhoneWithCensorship(
+                            selectedLeadForPreview.phone,
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
+                          Quantidade
+                        </span>
+                        <p className="font-semibold text-slate-900">
+                          {selectedLeadForPreview.quantity || 1} Unidades
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
+                          Província
+                        </span>
+                        <p className="font-semibold text-slate-900">
+                          {selectedLeadForPreview.province || "Luanda"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
+                          Total
+                        </span>
+                        <p className="font-bold text-indigo-600 text-base">
+                          {formatKz(getLeadPrice(selectedLeadForPreview))}
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        Bairro, Zona, Município (Endereço)
+                      </span>
+                      <p className="font-semibold text-slate-900 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
+                        {selectedLeadForPreview.area ||
+                          selectedLeadForPreview.address ||
+                          "N/A"}
+                      </p>
+                    </div>
+
+                    {(() => {
+                      const level = typeof selectedLeadForPreview.verificationLevel === "number"
+                        ? selectedLeadForPreview.verificationLevel
+                        : (selectedLeadForPreview.doubleCheck || selectedLeadForPreview.verified2x)
+                          ? 2
+                          : (selectedLeadForPreview.singleCheck || selectedLeadForPreview.verified1x)
+                            ? 1
+                            : 0;
+
+                      return (
+                        <div className="p-3.5 bg-gradient-to-r from-slate-50 to-indigo-50/30 border border-slate-200 rounded-2xl flex items-center justify-between shadow-xs">
+                          <div>
+                            <span className="block text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                              <BadgeCheck size={15} className={level === 2 ? "text-emerald-600" : level === 1 ? "text-indigo-600" : "text-slate-400"} />
+                              Confirmação do Lead
+                            </span>
+                            <p className="text-xs font-semibold mt-0.5">
+                              {level === 2 ? (
+                                <span className="text-emerald-700 font-bold flex items-center gap-1">
+                                  <CheckCheck size={15} className="text-emerald-600 stroke-[2.5]" /> Confirmado 2x (Dupla Confirmação)
+                                </span>
+                              ) : level === 1 ? (
+                                <span className="text-indigo-700 font-bold flex items-center gap-1">
+                                  <Check size={15} className="text-indigo-600 stroke-[2.5]" /> Confirmado 1x (Confirmação Simples)
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 font-medium">
+                                  ⏳ Pendente / Desmarcado
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleLeadDoubleCheck(selectedLeadForPreview.id, level)}
+                            className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                              level === 2
+                                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20 active:scale-95"
+                                : level === 1
+                                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20 active:scale-95"
+                                  : "bg-white border border-slate-300 text-slate-700 hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50/50 shadow-xs active:scale-95"
+                            }`}
+                          >
+                            {level === 2 ? (
+                              <>
+                                <CheckCheck size={16} className="stroke-[2.5]" />
+                                <span>Confirmado 2x</span>
+                              </>
+                            ) : level === 1 ? (
+                              <>
+                                <Check size={16} className="stroke-[2.5]" />
+                                <span>Confirmado 1x</span>
+                              </>
+                            ) : (
+                              <>
+                                <Check size={16} className="stroke-[2.5]" />
+                                <span>Marcar 1x</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })()}
+                    {selectedLeadForPreview.observacoes && (
+                      <div>
+                        <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
+                          Observações / Cor & Tamanho
+                        </span>
+                        <p className="font-semibold text-slate-900 p-2.5 bg-indigo-50/40 border border-indigo-100/50 rounded-lg whitespace-pre-wrap text-xs leading-relaxed">
+                          {getCleanObservacoes(selectedLeadForPreview)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <button
+                        onClick={() => handleCopyLead(selectedLeadForPreview)}
+                        className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                      >
+                        <Copy size={15} /> Copiar
+                      </button>
+
+                      {isStockLead(selectedLeadForPreview) ? (
+                        <button
+                          onClick={() => handleWhatsAppStockOrder(selectedLeadForPreview)}
+                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
+                          title="Confirmar encomenda em stock com envio imediato no WhatsApp"
+                        >
+                          <PackageCheck size={15} className="text-blue-600 shrink-0" />
+                          <span>Confir. Encomenda</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleWhatsAppReservation(selectedLeadForPreview)}
+                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
+                          title="Confirmar detalhes da reserva no WhatsApp"
+                        >
+                          <MessageSquare size={15} className="text-emerald-600 shrink-0" />
+                          <span>Reconfir. Reserva</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleWhatsAppDelivery(selectedLeadForPreview)}
+                        className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
+                        title="Confirmar aviso de chegada e entrega no WhatsApp"
+                      >
+                        <Truck size={15} className="text-teal-600 shrink-0" />
+                        <span>Confir. Entrega</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleWhatsAppPending(selectedLeadForPreview)}
+                        className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
+                        title="Enviar mensagem para lembrar e recuperar reserva pendente"
+                      >
+                        <Clock size={15} className="text-amber-600 shrink-0" />
+                        <span>Recuperar Pendente</span>
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedLeadForPreview(null);
+                        setModalState("none");
+                      }}
+                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition mt-1"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* WHATSAPP ACTION DISPATCH MODAL (POPUP TO CHOOSE COPY OR DIRECT SEND) */}
+      {whatsAppModalData && whatsAppModalData.isOpen && (
+        <WhatsAppActionModal
+          data={whatsAppModalData}
+          onClose={() => setWhatsAppModalData(null)}
+          isDark={isDark}
+        />
+      )}
+
+      {/* EXPORT OPTIONS MODAL PROMPT */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-2xl">
+                  <Download size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Export Data</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Choose your export format ({filteredData.length} leads selected)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-xl transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsExportModalOpen(false);
+                  handleExportCSV();
+                }}
+                className="p-4 bg-slate-950/90 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/50 rounded-2xl flex items-center gap-4 transition group text-left cursor-pointer active:scale-98"
+              >
+                <div className="p-3 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-xl group-hover:scale-110 transition-transform">
+                  <FileSpreadsheet size={24} />
+                </div>
+                <div className="flex-1">
+                  <span className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors block">
+                    Exportar para CSV (.csv)
+                  </span>
+                  <span className="text-xs text-slate-400 block mt-0.5">
+                    Formato de folha de cálculo otimizado para Excel, Google Sheets ou CRM
+                  </span>
+                </div>
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 text-center">
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(false)}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-200 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky Mobile CTA (Only visible on mobile when scrolling) */}
+      {isSalesView && view !== "sales-camisa-seda" && view !== "sales-visor-automovel" && modalState === "none" && !isCheckoutVisible && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 md:hidden z-30">
+          <button
+            onClick={() => {
+              const targetId = "comprar";
+              const inputId =
+                view === "sales-cinta-colombiana"
+                  ? "name-input-cinta"
+                  : view === "sales-camisa-seda"
+                  ? "name-input-camisa"
+                  : view === "sales"
+                  ? "name-input"
+                  : "name-input-roupas";
+              const targetEl = document.getElementById(targetId) || document.getElementById("checkout");
+              targetEl?.scrollIntoView({ behavior: "smooth" });
+              setTimeout(() => {
+                const inputEl = document.getElementById(inputId) as HTMLInputElement | null;
+                if (inputEl) {
+                  inputEl.focus();
+                } else if (view === "sales") {
+                  nameInputRef.current?.focus();
+                } else {
+                  nameInputRoupasRef.current?.focus();
+                }
+              }, 500);
+            }}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-lg py-3.5 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-95 transition-all cursor-pointer"
+          >
+            QUERO APROVEITAR
+          </button>
+        </div>
+      )}
+
+      {/* Social Proof Popup */}
+      <AnimatePresence>
+        {isSalesView && view !== "sales-visor-automovel" && activePopup && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="fixed bottom-[90px] md:bottom-6 left-4 right-4 md:right-auto z-40 bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_15px_40px_-10px_rgba(0,0,0,0.15)] p-4 flex items-center gap-4 border border-slate-200/60 max-w-[340px]"
+          >
+            <div className="relative">
+              <div className="bg-emerald-100 p-3 rounded-full text-emerald-600 shrink-0">
+                <PackageOpen size={22} className="opacity-90" />
+              </div>
+              <span className="absolute top-0 right-0 flex justify-center items-center h-3 w-3 -mt-0.5 -mr-0.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div>
+              <p className="text-[13px] md:text-sm text-slate-800 leading-tight mb-1">
+                <span className="font-bold">{activePopup.name}</span> em{" "}
+                <span className="font-semibold text-indigo-700">
+                  {activePopup.city}
+                </span>
+              </p>
+              <p className="text-[11px] md:text-xs text-slate-500 flex items-center gap-1.5">
+                Acabou de reservar uma unidade{" "}
+                <span className="text-slate-300">•</span>{" "}
+                <span className="text-emerald-600 font-medium">
+                  {activePopup.time}
+                </span>
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {view === "privacy" && (
+        <div className="max-w-4xl mx-auto px-4 py-16">
+          <button
+            onClick={() => setView("home")}
+            className="flex items-center gap-2 text-indigo-600 mb-8 font-medium hover:text-indigo-800 transition"
+          >
+            <ArrowLeft size={20} /> Voltar
+          </button>
+          <h1 className="text-4xl font-black mb-8 text-slate-900">
+            Políticas de Privacidade
+          </h1>
+          <div className="prose prose-lg text-slate-700">
+            <p>Data de entrada em vigor: 13 de Maio de 2026</p>
+            <p>
+              Na Valida C (desenvolvido pelo Grupo Cassaminha), a sua
+              privacidade é a nossa prioridade. Esta Política de Privacidade
+              explica como recolhemos, usamos, divulgamos e protegemos a sua
+              informação quando utiliza a nossa plataforma.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              1. Informação que Recolhemos
+            </h3>
+            <p>
+              Recolhemos informação que nos fornece diretamente, tal como quando
+              cria uma conta, contacta o nosso suporte ou utiliza os nossos
+              serviços. Isto pode incluir o seu nome, endereço de e-mail e
+              informação sobre o seu negócio e produtos.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              2. Como Usamos a Sua Informação
+            </h3>
+            <p>
+              Utilizamos a informação que recolhemos para operar, manter e
+              melhorar a plataforma Valida C, para comunicar consigo, e para
+              personalizar e melhorar a sua experiência.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              3. Partilha de Informação
+            </h3>
+            <p>
+              Não vendemos nem alugamos as suas informações pessoais a
+              terceiros. Apenas partilhamos as suas informações quando
+              necessário para fornecer os nossos serviços, cumprir com a lei, ou
+              proteger os nossos direitos.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              4. Segurança de Dados
+            </h3>
+            <p>
+              Implementamos medidas de segurança técnicas e organizacionais
+              concebidas para proteger as suas informações. No entanto, nenhum
+              sistema pode ser 100% seguro.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              5. Os Seus Direitos
+            </h3>
+            <p>
+              Dependendo da sua localização, pode ter o direito de aceder,
+              corrigir, eliminar ou restringir o uso das suas informações
+              pessoais.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              6. Contacte-nos
+            </h3>
+            <p>
+              Se tiver perguntas sobre esta Política de Privacidade, por favor
+              contacte-nos através do Grupo Cassaminha.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {view === "terms" && (
+        <div className="max-w-4xl mx-auto px-4 py-16">
+          <button
+            onClick={() => setView("home")}
+            className="flex items-center gap-2 text-indigo-600 mb-8 font-medium hover:text-indigo-800 transition"
+          >
+            <ArrowLeft size={20} /> Voltar
+          </button>
+          <h1 className="text-4xl font-black mb-8 text-slate-900">
+            Termos de Uso
+          </h1>
+          <div className="prose prose-lg text-slate-700">
+            <p>Última atualização: 13 de Maio de 2026</p>
+            <p>
+              Bem-vindo à Valida C, uma plataforma desenvolvida pelo Grupo
+              Cassaminha. Ao utilizar os nossos serviços, concorda com estes
+              Termos de Uso.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              1. Aceitação dos Termos
+            </h3>
+            <p>
+              Ao aceder ou usar a plataforma Valida C, concorda em ficar
+              vinculado por estes Termos e pela nossa Política de Privacidade.
+              Se não concordar com alguma parte dos termos, não deverá aceder ou
+              usar o serviço.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              2. Uso da Plataforma
+            </h3>
+            <p>
+              Concorda em utilizar a plataforma apenas para fins legais e de uma
+              maneira que não infrinja os direitos de terceiros ou restrinja o
+              uso da plataforma por outros utilizadores.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              3. Contas de Utilizador
+            </h3>
+            <p>
+              Para usar certas funcionalidades, terá de criar uma conta. É
+              responsável por manter a confidencialidade da sua conta e senha, e
+              por restringir o acesso ao seu computador ou dispositivo.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              4. Modificações do Serviço
+            </h3>
+            <p>
+              Reservamo-nos o direito de retirar ou alterar a plataforma, e
+              qualquer serviço ou material que fornecemos nela, a nosso
+              exclusivo critério e sem aviso prévio. Não seremos responsáveis
+              se, por qualquer motivo, todo ou parte da plataforma estiver
+              indisponível.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              5. Isenção de Garantias
+            </h3>
+            <p>
+              A plataforma é fornecida "tal como está" e "conforme disponível".
+              Não oferecemos garantias de qualquer tipo, expressas ou
+              implícitas, relativamente à operação da plataforma, às
+              informações, conteúdos ou materiais nela incluídos.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              6. Limitação de Responsabilidade
+            </h3>
+            <p>
+              Em nenhum caso a Valida C, o Grupo Cassaminha, ou os seus
+              diretores serão responsáveis por quaisquer danos decorrentes do
+              uso da plataforma ou relacionados ao uso da plataforma.
+            </p>
+
+            <h3 className="text-2xl font-bold mt-8 mb-4 text-slate-800">
+              7. Alterações aos Termos
+            </h3>
+            <p>
+              Podemos rever estes Termos de Uso a qualquer momento. Ao continuar
+              a usar o serviço após as alterações entrarem em vigor, você
+              concorda estar vinculado aos termos revistos.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Fixed Button for Mobile - REMOVED PER USER REQUEST */}
+      {/* (view === 'sales' || view === 'sales-roupas') && ... */}
+    </div>
+  );
+}

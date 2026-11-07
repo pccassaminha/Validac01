@@ -1,0 +1,8 @@
+{
+  "name": "Valida C",
+  "description": "CRM moderno de validação de leads, qualificação comercial, prospecção inteligente com IA e integração oficial Meta.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,116 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+
+    // Primitive Helpers
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    
+    function isAdmin() {
+      // Check if user is signed in and has the specific admin email or is an approved user in the database
+      return isSignedIn() && (
+        request.auth.token.email.lower() == "grupocassaminha@gmail.com" || 
+        request.auth.token.email.lower() == "grupocasssaminha@gmail.com" || 
+        request.auth.token.email.lower() == "exportacoes.extras@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == "approved")
+      );
+    }
+
+    // Validation Blueprint for Lead
+    function isValidLead(data) {
+      return data.keys().hasAll(['name', 'phone', 'produto', 'status', 'createdAt'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.phone is string && data.phone.size() > 0 && data.phone.size() <= 50
+        && data.produto is string
+        && data.status is string
+        && data.createdAt == request.time;
+    }
+
+    // Validation Blueprint for Lead Updates
+    function isValidLeadUpdate(data) {
+       return data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.phone is string && data.phone.size() > 0 && data.phone.size() <= 50
+        && data.produto is string
+        && data.status is string
+        && data.createdAt == existing().createdAt
+        && (!('doubleCheck' in data) || data.doubleCheck is bool)
+        && (!('verified2x' in data) || data.verified2x is bool);
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'status', 'createdAt'])
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 100
+        && data.status is string && data.status in ['pending', 'approved', 'blocked', 'expired']
+        && data.createdAt == request.time;
+    }
+
+    function isValidUserUpdate(data) {
+      return data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 100
+        && data.status is string && data.status in ['pending', 'approved', 'blocked', 'expired']
+        && data.createdAt == existing().createdAt;
+    }
+
+    // Leads Collection
+    match /leads/{leadId} {
+      // Only Admins can list and get the leads
+      allow get, list: if isAdmin();
+
+      // Anyone can submit a lead (unauthenticated creation is allowed for public forms)
+      allow create: if isValidId(leadId) && isValidLead(incoming());
+
+      // allow status or doubleCheck updates, or full updates by admin
+      allow update: if isValidLeadUpdate(incoming())
+        && (
+          isAdmin()
+          || incoming().diff(existing()).affectedKeys().hasOnly(['status', 'doubleCheck', 'verified2x'])
+        );
+
+      // Only Admins can delete
+      allow delete: if isAdmin() && isValidId(leadId);
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Users can only create their own document on registering
+      allow create: if isSignedIn() && ((request.auth.uid == userId && isValidUser(incoming())) || (isAdmin() && isValidUser(incoming())));
+
+      // Only admins can update the user details (or the user themselves)
+      allow update: if isSignedIn() && (
+        (isAdmin() && isValidUserUpdate(incoming()) && (incoming().diff(existing()).affectedKeys().hasOnly(['status']) || incoming().diff(existing()).affectedKeys().hasOnly([]))) ||
+        (request.auth.uid == userId && isValidUserUpdate(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email']))
+      );
+
+      allow list: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Settings Collection
+    match /settings/{settingId} {
+      // Readable by anyone (to load tracking config)
+      allow read: if true;
+      
+      // Only Admins can modify settings
+      allow write: if isAdmin();
+    }
+
+    // Connection Test Collection
+    match /test/{testId} {
+      allow read: if true;
+    }
+  }
+}
