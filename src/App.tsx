@@ -1760,6 +1760,24 @@ export default function App() {
       .then((docRef) => {
         setCurrentLeadId(docRef.id);
         trackEvent(produtoName, "generate_lead", "Lead", appSettings);
+
+        // Disparo oficial Meta Pixel & Conversions API (CAPI) para novo Lead
+        sendMetaConversionEvent({
+          eventName: "Lead",
+          lead: {
+            name: tempLead.name,
+            phone: tempLead.phone,
+            province: tempLead.province,
+            produto: tempLead.produto,
+            price: tempLead.totalPrice,
+            leadId: docRef.id,
+          },
+          actionSource: "website",
+          customData: {
+            crm_status: "lead_recebido",
+            quantity: tempLead.quantity,
+          },
+        });
       })
       .catch((err: any) => {
         if (
@@ -1802,6 +1820,24 @@ export default function App() {
         appSettings,
       );
       trackEvent(produtoName, "subscribe", "Subscribe", appSettings);
+
+      // Disparo oficial Meta Pixel & Conversions API (CAPI) para Registro Concluído
+      sendMetaConversionEvent({
+        eventName: "CompleteRegistration",
+        lead: {
+          name: lastSubmittedLead?.name || formData.name,
+          phone: lastSubmittedLead?.phone || formData.phone,
+          province: lastSubmittedLead?.province || formData.province,
+          produto: produtoName,
+          price: lastSubmittedLead?.totalPrice || 17000,
+          leadId: currentLeadId || undefined,
+        },
+        actionSource: "website",
+        customData: {
+          crm_status: "reserva_confirmada",
+          quantity: lastSubmittedLead?.quantity || formData.quantity || 1,
+        },
+      });
     } else {
       setTimeout(() => setModalState("rejected"), 300);
     }
@@ -2221,7 +2257,7 @@ export default function App() {
       norm.includes("Secador") ||
       norm.includes("Inteligente")
     ) {
-      return "https://www.cstoreao.shop/produto/Secador-Inteligente";
+      return "https://cstoreao.shop/produto/Secador-Inteligente";
     }
 
     if (lead?.pageUrl || lead?.productUrl || lead?.url) {
@@ -2231,7 +2267,7 @@ export default function App() {
       }
     }
 
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://www.cstoreao.shop";
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://cstoreao.shop";
     const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
     const baseUrl = `${origin}${pathname}`;
 
@@ -5869,7 +5905,7 @@ Se tiver alguma dúvida ou precisar de apoio para finalizar, responda a esta men
               inovadores a preços incríveis.
             </p>
             <a
-              href="https://www.cstoreao.shop/"
+              href="https://cstoreao.shop/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex justify-center items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-medium py-3 px-8 rounded-full border border-slate-700 transition hover:border-slate-500"
@@ -7519,7 +7555,7 @@ Se tiver alguma dúvida ou precisar de apoio para finalizar, responda a esta men
                           Clique no botão acima para enviar os detalhes da sua entrega diretamente para o nosso atendimento.
                         </p>
                         <a
-                          href="https://www.cstoreao.shop/"
+                          href="https://cstoreao.shop/"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="w-full flex justify-center items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 px-4 rounded-xl transition-all active:scale-[0.98] border border-slate-200 text-xs"
@@ -7547,7 +7583,7 @@ Se tiver alguma dúvida ou precisar de apoio para finalizar, responda a esta men
                           <span>PARTILHAR NO WHATSAPP</span>
                         </a>
                         <a
-                          href="https://www.cstoreao.shop/"
+                          href="https://cstoreao.shop/"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="w-full flex justify-center items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-4 px-4 rounded-xl transition-transform active:scale-[0.98] border border-slate-200"
@@ -7582,7 +7618,7 @@ Se tiver alguma dúvida ou precisar de apoio para finalizar, responda a esta men
                 </p>
                 <div className="space-y-3">
                   <a
-                    href="https://www.cstoreao.shop/"
+                    href="https://cstoreao.shop/"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full flex justify-center items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-xl transition-transform active:scale-[0.98]"

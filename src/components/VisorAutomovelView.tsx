@@ -121,6 +121,13 @@ export default function VisorAutomovelView({
   const normalSum = selectedQty * unitRefPrice;
   const savings = normalSum - currentTotal;
 
+  // Fix province to Luanda exclusively
+  useEffect(() => {
+    if (formData.province !== "Luanda") {
+      setFormData((prev: any) => ({ ...prev, province: "Luanda" }));
+    }
+  }, []);
+
   // Auto-rotate gallery every 3.200ms
   useEffect(() => {
     // Respect prefers-reduced-motion
@@ -989,37 +996,34 @@ export default function VisorAutomovelView({
                 </p>
               </div>
 
-              {/* Província */}
+              {/* Província (Bloqueada em Luanda) */}
               <div>
                 <label className="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-1.5">
                   Província de Entrega *
                 </label>
                 <div className="relative">
                   <select
-                    value={formData.province || "Luanda"}
-                    onChange={(e) =>
-                      setFormData({ ...formData, province: e.target.value })
-                    }
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none pl-11 pr-8 py-3.5 rounded-xl text-white font-medium text-sm transition appearance-none cursor-pointer"
+                    disabled
+                    value="Luanda"
+                    className="w-full bg-slate-900/90 border border-emerald-500/50 pl-11 pr-8 py-3.5 rounded-xl text-emerald-400 font-bold text-sm appearance-none cursor-not-allowed shadow-inner"
                   >
-                    {PROVINCIAS_ANGOLA.map((prov) => (
-                      <option key={prov} value={prov} className="bg-slate-900 text-white">
-                        {prov}
-                      </option>
-                    ))}
-                    <option value="Outra" className="bg-slate-900 text-white">
-                      Outra Província
+                    <option value="Luanda" className="bg-slate-900 text-emerald-400 font-bold">
+                      Luanda (Exclusivo — Entrega Gratuita)
                     </option>
                   </select>
                   <MapPin
                     size={17}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-500"
                   />
-                  <ChevronDown
+                  <Check
                     size={16}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none stroke-[3]"
                   />
                 </div>
+                <p className="text-[11px] text-emerald-400/90 font-medium mt-1.5 flex items-center gap-1">
+                  <ShieldCheck size={13} className="text-emerald-500 shrink-0" />
+                  <span>Entregas rápidas com frete grátis disponíveis exclusivamente na Província de Luanda.</span>
+                </p>
               </div>
 
               {/* Endereço / Bairro / Município */}

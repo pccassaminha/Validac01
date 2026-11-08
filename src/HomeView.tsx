@@ -187,7 +187,7 @@ export default function HomeView({ setView, isAuthenticated, currentUser, userNa
             <h4 className="text-white font-bold mb-6 tracking-tight uppercase text-xs opacity-50">Ecossistema Grupo Cassaminha</h4>
             <div className="flex flex-wrap justify-center gap-4">
               <a 
-                href="https://www.cstoreao.shop/" 
+                href="https://cstoreao.shop/" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="px-6 py-2.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all text-sm font-semibold flex items-center gap-2"
@@ -201,7 +201,7 @@ export default function HomeView({ setView, isAuthenticated, currentUser, userNa
                 Valida C
               </button>
               <a 
-                href="https://www.cstoreao.shop/page" 
+                href="https://cstoreao.shop/page" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="px-6 py-2.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all text-sm font-semibold flex items-center gap-2"
