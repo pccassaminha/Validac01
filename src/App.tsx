@@ -1113,22 +1113,16 @@ export default function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [crmProductFilter, setCrmProductFilter] = useState("Todos");
   const crmAvailableProducts = useMemo(() => {
-    const list = Array.from(
-      new Set(
-        adminData
-          .map((d) => d.produto)
-          .filter(Boolean),
-      ),
-    );
-    if (list.length === 0) {
-      return [
-        "Secador Inteligente UV",
-        "Cinta Modeladora Colombiana",
-        "Camisa de Seda Masculina",
-        "Roteador 5G Ultra Desbloqueado",
-      ];
-    }
-    return list;
+    const defaultProducts = [
+      "Visor Automóvel Anti-Encandeamento 2 em 1",
+      "Secador Inteligente UV",
+      "Cinta Modeladora Colombiana",
+      "Camisa Seda Gelada Premium",
+      "Roteador 5G Ultra Desbloqueado",
+      "Base Móvel 360°",
+    ];
+    const existingFromLeads = adminData.map((d) => d.produto).filter(Boolean);
+    return Array.from(new Set([...defaultProducts, ...existingFromLeads]));
   }, [adminData]);
   const [theme, setTheme] = useState<"dark" | "light">(
     () => (localStorage.getItem("validaC_theme") as "dark" | "light") || "dark",
